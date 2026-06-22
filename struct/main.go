@@ -1,17 +1,75 @@
 package main
 
+import "fmt"
+
+type additionalInfo struct {
+	phone   int
+	address string
+}
+
+// type user struct {
+// 	name  string
+// 	email string
+
+// 	metaInfo additionalInfo
+// }
+
+type user struct {
+	name string
+	age  int
+	role string
+}
+
 func main() {
-	// struct
-	// type person struct {
-	// 	firstName string
-	// 	lastName string
-	// 	age int
+
+	// john := user{"John Doe", "johndoe@go.dev"} // Positional parameters
+
+	// Key-Value parameters
+	// john := user{
+	// 	name:  "John Doe",
+	// 	email: "johndoe@go.dev",
 	// }
 
-	// var person1 person
-	// person1.firstName = "John"
-	// person1.lastName = "Doe"
-	// person1.age = 30
+	// john.name = "Jane"
+
+	// fmt.Println(john)
+	// fmt.Printf("%+v", john) // %+v will print the struct
+	// fmt.Println(john.name)
+
+	// var user1 user
+
+	// user1.name = "John Doe"
+	// user1.email = "johndoe@go.dev"
+
+	// fmt.Println(user1)
+
+	// john := user{
+	// 	name:  "John Doe",
+	// 	email: "johndoe@go.dev",
+	// 	metaInfo: additionalInfo{
+	// 		phone:   1234567890,
+	// 		address: "123 Main Street",
+	// 	},
+	// }
+
+	// fmt.Printf("%+v", john)
+
+	newUser := func(name string, age int, role string) user {
+		if age <= 0 {
+			age = 18
+		}
+
+		return user{
+			name: name,
+			age:  age,
+			role: role,
+		}
+	}
+
+	john := newUser("John Doe", -30, "admin")
+
+	fmt.Print(john)
+
 }
 
 // Create struct type
