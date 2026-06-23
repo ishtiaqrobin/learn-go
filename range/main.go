@@ -94,7 +94,7 @@ func main() {
 	fmt.Println()
 
 	//* =========================================================================
-	// ৫. CHANNEL (চ্যানেল) - গোরুটিনের মধ্যকার নিরাপদ যোগাযোগ পাইপলাইন
+	// ৫. CHANNEL (চ্যানেল) - [Goroutine] গোরুটিনের মধ্যকার নিরাপদ যোগাযোগ পাইপলাইন
 	//* =========================================================================
 	fmt.Println("--- 5. Channel Demo ---")
 
@@ -103,6 +103,7 @@ func main() {
 
 	// একটি নতুন 'Goroutine' (background thread) চালু করলাম যা মূল কোডের সমান্তরালে চলবে।
 	go func() {
+		// ব্যাকগ্রাউন্ডে কাজ চলছে, ২ সেকেন্ড অপেক্ষা করছি...
 		fmt.Println("[Goroutine] Working in the background, waiting 2 seconds...")
 		time.Sleep(2 * time.Second)
 
@@ -110,6 +111,7 @@ func main() {
 		messages <- "Hello from Background Goroutine!"
 	}()
 
+	//  চ্যানেল থেকে ডাটা আসার জন্য অপেক্ষা করছি (Blocking)...
 	fmt.Println("[Main] Waiting for data to arrive from the channel (Blocking)...")
 
 	// [ইন্টারনাল]: চ্যানেল থেকে ডাটা রিসিভ করা (Arrow-র দিক ভ্যারিয়েবলের দিকে)
@@ -120,5 +122,6 @@ func main() {
 	// -> যখন গো-তে একাধিক ব্যাকগ্রাউন্ড টাস্ক (Goroutine) একসাথে চলে এবং তাদের মধ্যে নিরাপদে ডাটা আদান-প্রদান করতে হয়।
 	// -> উদাহরণ: ব্যাকগ্রাউন্ডে একটা বড় ফাইল আপলোড হচ্ছে, আপলোড শেষ হলে মেইন থ্রেডকে নোটিফিকেশন পাঠানো।
 
+	// ডাটা পেয়ে গেছি:
 	fmt.Printf("[Main] I got the data: %s\n", receivedMsg)
 }
