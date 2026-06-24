@@ -23,7 +23,7 @@ func main() {
 
 	// fmt.Println("a :", &a)
 
-	// & --> address of a variable
+	// & --> address of a variable (memory address)
 	// * --> dereferencing operator (value from memory address)
 
 	// y := 20

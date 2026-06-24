@@ -1,66 +1,114 @@
+// package main
+
+// import "fmt"
+
+// type PaymentMethod interface {
+// 	pay(amount float64) // এটাই সেই ২ ইঞ্চির ব্যাটারির নিয়ম!
+// }
+
+// type bKash struct {
+// 	apiKey string
+// }
+
+// type Rocket struct {
+// 	apiKey string
+// }
+
+// func (bk *bKash) pay(amount float64) {
+// 	// actual payment logic
+// 	fmt.Printf("Paying %.2f tk with bKash \n", amount)
+// }
+
+// func (r *Rocket) pay(amount float64) {
+// 	// actual payment logic
+// 	fmt.Printf("Paying %.2f tk with Rocket", amount)
+// }
+
+// // তোমার ঘড়ির নাম PaymentService
+// type PaymentService struct {
+// 	method PaymentMethod
+// }
+
+// func NewPaymentService(method PaymentMethod) *PaymentService {
+// 	return &PaymentService{
+// 		method: method,
+// 	}
+// }
+
+// func NewRocket(apiKey string) *Rocket {
+// 	return &Rocket{
+// 		apiKey: apiKey,
+// 	}
+// }
+
+// func (ps PaymentService) checkout() {
+// 	ps.method.pay(10.00)
+// }
+
+// type MockPaymentMethod struct{}
+
+// func (mockPM MockPaymentMethod) pay(amount float64) {
+// 	// test logic
+// 	fmt.Println("Testing payment method")
+// }
+
+// func main() {
+// 	// bkash := bKash{apiKey: "1234abc"}
+// 	// paymentServiceBkash := NewPaymentService(&bkash)
+// 	// paymentServiceBkash.checkout()
+
+// 	// rocket := NewRocket("1234abc")
+// 	// paymentServiceRocket := NewPaymentService(rocket)
+// 	// paymentServiceRocket.checkout()
+
+// 	mockPm := MockPaymentMethod{}                   // ১. টেবিলের ওপর একটা কাগজের ব্যাটারি বানালে।
+// 	paymentServiceMock := NewPaymentService(mockPm) // ২. ঘড়ির স্লটে কাগজের ব্যাটারিটা পুশ করলে।
+// 	paymentServiceMock.checkout()                   // ৩. ঘড়ির টিকটিক বাটন চাপলে।
+// }
+
 package main
 
-import "fmt"
-
-type PaymentMethod interface {
-	pay(amount float64)
-}
-
-type bKash struct {
-	apiKey string
-}
-
-type Rocket struct {
-	apiKey string
-}
-
-func (bk *bKash) pay(amount float64) {
-	// actual payment logic
-	fmt.Printf("Paying %.2f tk with bKash \n", amount)
-}
-
-func (r *Rocket) pay(amount float64) {
-	// actual payment logic
-	fmt.Printf("Paying %.2f tk with Rocket", amount)
-}
-
-type PaymentService struct {
-	method PaymentMethod
-}
-
-func NewPaymentService(method PaymentMethod) *PaymentService {
-	return &PaymentService{
-		method: method,
-	}
-}
-
-func NewRocket(apiKey string) *Rocket {
-	return &Rocket{
-		apiKey: apiKey,
-	}
-}
-
-func (ps PaymentService) checkout() {
-	ps.method.pay(10.00)
-}
-
-type MockPaymentMethod struct{}
-
-func (mockPM MockPaymentMethod) pay(amount float64) {
-	// test logic
-	fmt.Println("Testing payment method")
-}
-
 func main() {
-	// bkash := bKash{apiKey: "1234abc"}
-	// paymentServiceBkash := NewPaymentService(&bkash)
-	// paymentServiceBkash.checkout()
-
-	// rocket := NewRocket("1234abc")
-	// paymentServiceRocket := NewPaymentService(rocket)
-	// paymentServiceRocket.checkout()
-
+	// ---------------------------------------------------------------------
+	// সিনারিও ১: কাগজের ব্যাটারি (Mock) দিয়ে টেস্ট রান
+	// ---------------------------------------------------------------------
+	// স্টেপ ১: টেবিলের ওপর একটা কাগজের খালি ডামি ব্যাটারি বানালে
 	mockPm := MockPaymentMethod{}
+
+	// স্টেপ ২: ঘড়ির স্লটে কাগজের ব্যাটারিটা পুশ করলে (NewPaymentService-এর মাধ্যমে)
 	paymentServiceMock := NewPaymentService(mockPm)
+
+	// স্টেপ ৩: ঘড়ির টিকটিক বাটন চাপলে। ঘড়ি ভেতরের মক ব্যাটারির pay() মেথড ট্রিগার করল।
 	paymentServiceMock.checkout()
+	// আউটপুট: Testing mode active: Clock is ticking perfectly with Mock Battery!
+
+	// ---------------------------------------------------------------------
+	// সিনারিও ২: বিকাশের আসল ব্যাটারি কানেক্ট করা (পয়েন্টার রিসিভার টেস্ট)
+	// ---------------------------------------------------------------------
+	/*
+		// স্টেপ ১: বিকাশের একটা আসল ব্যাটারি বানালে এপিআই কি দিয়ে
+		bkash := bKash{apiKey: "bkash_secret_999"}
+
+		// স্টেপ ২: যেহেতু বিকাশের মেথডে স্টার (*) আছে, তাই ঘড়ির স্লটে দিতে হবে তার অ্যাড্রেস (&bkash)
+		paymentServiceBkash := NewPaymentService(&bkash)
+
+		// স্টেপ ৩: ঘড়ির বাটন চাপলে, ঘড়ি সোজা ওই অ্যাড্রেসে গিয়ে বিকাশের আসল পেমেন্ট লজিক রান করবে
+		paymentServiceBkash.checkout()
+		// আউটপুট: Paying 10.00 tk with bKash (Using API Key: bkash_secret_999)
+	*/
+
+	// ---------------------------------------------------------------------
+	// সিনারিও ৩: রকেটের রেডিমেড ব্যাটারি কানেক্ট করা
+	// ---------------------------------------------------------------------
+	/*
+		// স্টেপ ১: রকেটের শোরুম (NewRocket) থেকে সরাসরি একটা তৈরি করা ব্যাটারির অ্যাড্রেস আনলে
+		rocket := NewRocket("rocket_secret_777")
+
+		// স্টেপ ২: রকেটের শোরুম নিজেই অ্যাড্রেস দেয়, তাই আলাদা করে '&' না দিয়ে সরাসরি স্লটে বসালে
+		paymentServiceRocket := NewPaymentService(rocket)
+
+		// স্টেপ ৩: বাটন চাপতেই রকেটের মেথড রান হলো
+		paymentServiceRocket.checkout()
+		// আউটপুট: Paying 10.00 tk with Rocket (Using API Key: rocket_secret_777)
+	*/
 }
