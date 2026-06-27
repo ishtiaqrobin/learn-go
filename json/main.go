@@ -1,11 +1,14 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type person struct {
-	Name string
-	Age  int
-	City string
+	Name string `json:"personName"` // json tag/struct tag
+	Age  int    `json:"-"`          // use - to ignore
+	City string `json:"city"`       // use json tag
 }
 
 func main() {
@@ -15,5 +18,11 @@ func main() {
 		City: "Dhaka",
 	}
 
-	json.Marshal(p)
+	rawJson, err := json.Marshal(p)
+
+	if err != nil {
+		fmt.Println("Error", err)
+	}
+
+	fmt.Println(string(rawJson))
 }
