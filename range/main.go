@@ -125,3 +125,9 @@ func main() {
 	// ডাটা পেয়ে গেছি:
 	fmt.Printf("[Main] I got the data: %s\n", receivedMsg)
 }
+
+// array
+// slice
+// string
+// map
+// channel

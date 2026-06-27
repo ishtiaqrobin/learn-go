@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Range Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e14;
+            --panel: #11161f;
+            --panel-2: #0d121a;
+            --line: #232b38;
+            --line-soft: #1a212c;
+            --text: #c7d0dc;
+            --text-dim: #6b7686;
+            --text-bright: #eef2f7;
+
+            --stack: #ff8a7a;
+            --stack-dim: #5a3934;
+            --heap: #4fd8a8;
+            --heap-dim: #2f4a3f;
+            --code: #8aa6ff;
+            --code-dim: #36406b;
+            --pointer: #ffcc66;
+            --value: #c792ea;
+            --map-acc: #ff9ecb;
+
+            --kw: #ff8a7a;
+            --type: #ffb454;
+            --str: #4fd8a8;
+            --com: #5b6677;
+            --fn: #8aa6ff;
+
+            --sans: 'Space Grotesk', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 28px 40px;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(138, 166, 255, 0.08), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(79, 216, 168, 0.06), transparent 40%),
+                var(--bg);
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            max-width: 1480px;
+            margin: 0 auto 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line-soft);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .masthead h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-bright);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .masthead h1 .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--code);
+            box-shadow: 0 0 12px var(--code);
+        }
+
+        .masthead .sub {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+
+        /* ---------- Topic tabs ---------- */
+        .topic-tabs {
+            display: flex;
+            gap: 8px;
+            max-width: 1480px;
+            margin: 0 auto 18px;
+            flex-wrap: wrap;
+        }
+
+        .topic-tab {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            font-weight: 600;
+            background: var(--panel-2);
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            padding: 9px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all .2s ease;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .topic-tab .tdot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .topic-tab.active {
+            color: var(--text-bright);
+            border-color: #3a4555;
+            background: #161d27;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 0.95fr 1.5fr;
+            gap: 18px;
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        /* ---------- Code panel ---------- */
+        .code-panel .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .traffic {
+            display: flex;
+            gap: 6px;
+        }
+
+        .traffic span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .traffic span:nth-child(1) {
+            background: #ff5f57;
+        }
+
+        .traffic span:nth-child(2) {
+            background: #febc2e;
+        }
+
+        .traffic span:nth-child(3) {
+            background: #28c840;
+        }
+
+        .filename {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .code-container {
+            font-family: var(--mono);
+            line-height: 1.7;
+            font-size: 13.2px;
+            padding: 14px 0 18px;
+            white-space: pre;
+            overflow-x: auto;
+            min-height: 480px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .line {
+            position: relative;
+            padding: 1px 18px 1px 50px;
+            transition: background-color .25s ease, border-color .25s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .line .ln {
+            position: absolute;
+            left: 16px;
+            width: 24px;
+            text-align: right;
+            color: #3a4250;
+            font-size: 11.5px;
+            user-select: none;
+        }
+
+        .line.active {
+            background: linear-gradient(90deg, rgba(138, 166, 255, 0.14), rgba(138, 166, 255, 0.03) 70%);
+            border-left-color: var(--code);
+        }
+
+        .line.faded {
+            opacity: 0.4;
+        }
+
+        .kw {
+            color: var(--kw);
+            font-weight: 600;
+        }
+
+        .type {
+            color: var(--type);
+        }
+
+        .com {
+            color: var(--com);
+            font-style: italic;
+        }
+
+        .fn {
+            color: var(--fn);
+        }
+
+        .str {
+            color: var(--str);
+        }
+
+        /* ---------- Visual panel ---------- */
+        .vis-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .vis-head .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .vis-head .phase {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.08);
+            border: 1px solid rgba(255, 204, 102, 0.25);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .vis-wrap {
+            position: relative;
+            padding: 20px;
+            min-height: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .vis-zone {
+            border-radius: 8px;
+            padding: 14px;
+            background: var(--panel-2);
+            border: 1.5px solid var(--line);
+        }
+
+        .vis-zone-title {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            text-transform: uppercase;
+        }
+
+        .vis-zone-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.2;
+        }
+
+        /* ---------- generic cell grid ---------- */
+        .cell-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cell {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            text-align: center;
+            transition: all .3s cubic-bezier(.25, 1, .5, 1);
+            position: relative;
+            min-width: 64px;
+        }
+
+        .cell .idx {
+            font-size: 9.5px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .cell .val {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-bright);
+        }
+
+        .cell.active {
+            border-color: var(--code);
+            background: rgba(138, 166, 255, 0.12);
+            transform: translateY(-4px) scale(1.06);
+            box-shadow: 0 8px 18px -8px rgba(138, 166, 255, 0.6);
+        }
+
+        .cell.active .idx {
+            color: var(--code);
+            font-weight: 700;
+        }
+
+        .cell.done {
+            opacity: 0.55;
+        }
+
+        .cell.ghost {
+            opacity: 0.25;
+            border-style: dashed;
+        }
+
+        .cell.new-grow {
+            border-color: var(--heap);
+            background: rgba(79, 216, 168, 0.1);
+            animation: growIn .4s cubic-bezier(.25, 1, .5, 1);
+        }
+
+        @keyframes growIn {
+            from {
+                opacity: 0;
+                transform: scale(0.7);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* byte/rune dual rows for string */
+        .byte-cell {
+            min-width: 42px;
+            padding: 8px 6px;
+        }
+
+        .byte-cell .val {
+            font-size: 12.5px;
+        }
+
+        .rune-cell .val {
+            font-size: 18px;
+        }
+
+        /* map buckets */
+        .map-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .map-cell {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 10px 14px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            min-width: 160px;
+            transition: all .3s cubic-bezier(.25, 1, .5, 1);
+            position: relative;
+        }
+
+        .map-cell .mk {
+            font-size: 11px;
+            color: var(--map-acc);
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+
+        .map-cell .mv {
+            font-size: 13px;
+            color: var(--text-bright);
+        }
+
+        .map-cell.active {
+            border-color: var(--map-acc);
+            background: rgba(255, 158, 203, 0.1);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 18px -8px rgba(255, 158, 203, 0.55);
+        }
+
+        .map-cell.done {
+            opacity: 0.5;
+        }
+
+        .map-order-badge {
+            position: absolute;
+            top: -9px;
+            right: -9px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--map-acc);
+            color: #1a0d14;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* channel lanes */
+        .lane-track {
+            position: relative;
+            height: 64px;
+            border-radius: 8px;
+            background: #0d121a;
+            border: 1px solid var(--line-soft);
+            overflow: hidden;
+        }
+
+        .lane-label {
+            position: absolute;
+            left: 10px;
+            top: 6px;
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            letter-spacing: 0.05em;
+            z-index: 2;
+        }
+
+        .lane-runner {
+            position: absolute;
+            top: 50%;
+            left: 8px;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            transition: left 1.4s linear;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .lane-runner.main {
+            background: var(--code);
+            color: var(--code);
+        }
+
+        .lane-runner.goroutine {
+            background: var(--heap);
+            color: var(--heap);
+        }
+
+        .lane-blocked-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: rgba(255, 138, 122, 0.12);
+            border-left: 1px dashed var(--stack);
+            border-right: 1px dashed var(--stack);
+            opacity: 0;
+            transition: opacity .3s ease;
+        }
+
+        .lane-blocked-zone.show {
+            opacity: 1;
+        }
+
+        .lane-tag {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 9px;
+            font-family: var(--mono);
+            color: var(--stack);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity .3s ease;
+        }
+
+        .lane-tag.show {
+            opacity: 1;
+        }
+
+        .channel-pipe {
+            position: relative;
+            height: 40px;
+            border-radius: 20px;
+            background: #0d121a;
+            border: 1.5px dashed var(--line-soft);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            overflow: hidden;
+        }
+
+        .channel-pipe .pipe-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: var(--mono);
+        }
+
+        .channel-payload {
+            position: absolute;
+            top: 50%;
+            left: 16px;
+            transform: translate(0, -50%);
+            font-family: var(--mono);
+            font-size: 11px;
+            color: #0a0e14;
+            background: var(--pointer);
+            padding: 4px 10px;
+            border-radius: 14px;
+            opacity: 0;
+            white-space: nowrap;
+            transition: left 1.1s cubic-bezier(.25, 1, .5, 1), opacity .3s ease;
+        }
+
+        .channel-payload.show {
+            opacity: 1;
+        }
+
+        /* integer range */
+        .int-track {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .int-cell {
+            width: 46px;
+            height: 46px;
+            border-radius: 8px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .int-cell.active {
+            border-color: var(--code);
+            background: rgba(138, 166, 255, 0.14);
+            color: var(--text-bright);
+            transform: scale(1.08);
+            box-shadow: 0 8px 16px -8px rgba(138, 166, 255, 0.6);
+        }
+
+        .int-cell.done {
+            color: var(--code);
+            opacity: 0.7;
+            border-color: var(--code-dim);
+        }
+
+        .info-strip {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-dim);
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            margin-top: 4px;
+        }
+
+        /* ---------- Bottom panel ---------- */
+        .bottom-panel {
+            grid-column: 1 / -1;
+            padding: 20px 22px;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            position: relative;
+            margin-bottom: 22px;
+            padding: 0 6px;
+            overflow-x: auto;
+            gap: 4px;
+        }
+
+        .step-track {
+            position: relative;
+            flex: 1;
+            min-width: 600px;
+        }
+
+        .step-track::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background: var(--line);
+            z-index: 1;
+        }
+
+        .step-track .progress {
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            height: 2px;
+            background: var(--code);
+            z-index: 2;
+            transition: width .35s cubic-bezier(.25, 1, .5, 1);
+            width: 0%;
+        }
+
+        .step-track-inner {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 3;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            width: auto;
+            min-width: 64px;
+        }
+
+        .step-node {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            border: 2px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .step.active .step-node {
+            border-color: var(--code);
+            background: var(--code);
+            color: #0a0e14;
+            box-shadow: 0 0 12px rgba(138, 166, 255, 0.55);
+        }
+
+        .step.done .step-node {
+            border-color: var(--code-dim);
+            color: var(--code);
+            background: transparent;
+        }
+
+        .step .step-label {
+            font-size: 9.5px;
+            color: var(--text-dim);
+            text-align: center;
+            max-width: 74px;
+        }
+
+        .step.active .step-label {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 13.5px;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #3a4555;
+            background: #161d27;
+            transform: translateY(-1px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #btnNext {
+            background: linear-gradient(135deg, #6f8cff, #8aa6ff);
+            color: #0a0e14;
+            border-color: transparent;
+        }
+
+        #btnNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        .console-box {
+            background: #05070a;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--code);
+            padding: 14px 16px;
+            border-radius: 7px;
+            font-size: 13.5px;
+            line-height: 1.65;
+            min-height: 54px;
+            transition: border-left-color .3s ease;
+        }
+
+        .console-box .hl {
+            color: var(--pointer);
+            font-weight: 700;
+        }
+
+        .console-box .hl-heap {
+            color: var(--heap);
+            font-weight: 700;
+        }
+
+        .console-box .hl-stack {
+            color: var(--stack);
+            font-weight: 700;
+        }
+
+        .console-box .hl-code {
+            color: var(--fn);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .console-box .hl-map {
+            color: var(--map-acc);
+            font-weight: 700;
+        }
+
+        .output-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .output-chip {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: rgba(79, 216, 168, 0.08);
+            border: 1px solid rgba(79, 216, 168, 0.3);
+            color: var(--heap);
+            padding: 4px 10px;
+            border-radius: 6px;
+            opacity: 0;
+            animation: chipIn .35s ease forwards;
+        }
+
+        @keyframes chipIn {
+            from {
+                opacity: 0;
+                transform: scale(0.85);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .takeaway-card {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12.5px;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--heap);
+            background: var(--panel-2);
+            opacity: 0;
+            animation: chipIn .4s ease forwards;
+        }
+
+        .takeaway-card .tt {
+            font-weight: 700;
+            font-size: 11.5px;
+            color: var(--heap);
+            margin-bottom: 4px;
+        }
+
+        .takeaway-card .td {
+            color: var(--text-dim);
+        }
+
+        @media (max-width: 980px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .step .step-label {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="masthead">
+        <h1><span class="dot"></span>Go Range — Iteration Mechanics Visualizer</h1>
+        <div class="sub">array · slice · string · map · channel · int</div>
+    </div>
+
+    <div class="topic-tabs" id="topicTabs"></div>
+
+    <div class="container">
+        <!-- LEFT: CODE -->
+        <div class="panel code-panel">
+            <div class="panel-head">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                <div class="filename" id="filenameTag">range_demo.go</div>
+            </div>
+            <div class="code-container" id="codeView"></div>
+        </div>
+
+        <!-- RIGHT: VISUAL -->
+        <div class="panel vis-panel">
+            <div class="vis-head">
+                <div class="label" id="visLabel">Data Structure</div>
+                <div class="phase" id="phaseTag">idle</div>
+            </div>
+            <div class="vis-wrap" id="visWrap"></div>
+        </div>
+
+        <!-- BOTTOM: CONTROLS -->
+        <div class="panel bottom-panel">
+            <div class="stepper">
+                <div class="step-track" id="stepTrack">
+                    <div class="progress" id="stepperProgress"></div>
+                    <div class="step-track-inner" id="stepTrackInner"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="btnNext" onclick="nextStep()">Next step ▶</button>
+                <button id="btnReset" onclick="resetSim()">↺ Reset</button>
+            </div>
+
+            <div class="console-box" id="consoleMsg">একটা topic বেছে নিয়ে <b>Next step</b> চাপো।</div>
+            <div id="extraRow"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           TOPIC DEFINITIONS
+           each topic: { key, label, accent, code: [{html}], steps: [...] }
+           step: { activeLines, phase, console, render(visWrap, stepIdx), node, output? , takeaway? }
+        ========================================================================= */
+
+        const ACCENTS = {
+            array: 'var(--stack)', slice: 'var(--heap)', string: 'var(--str)',
+            map: 'var(--map-acc)', channel: 'var(--pointer)', intrange: 'var(--code)'
+        };
+
+        /* ---------------- ARRAY ---------------- */
+        const arrayCode = [
+            { html: '<span class="com">// 1. ARRAY — fixed-size, declared with [3]</span>' },
+            { html: 'myArr := [<span class="type">3</span>]<span class="type">string</span>{<span class="str">"red"</span>, <span class="str">"green"</span>, <span class="str">"blue"</span>}' },
+            { html: '' },
+            { html: '<span class="kw">for</span> i, value := <span class="kw">range</span> myArr {' },
+            { html: '    fmt.Printf(<span class="str">"Index: %d, Value: %s\\n"</span>, i, value)' },
+            { html: '}' },
+        ];
+        const arrayData = ['red', 'green', 'blue'];
+        function arraySteps() {
+            const steps = [{
+                node: 0, phase: 'array created', activeLines: [1],
+                console: `<span class="hl-stack">myArr</span> ৩টা slot নিয়ে fixed-size মেমোরিতে তৈরি হলো — size <span class="hl">[3]</span> compile-time-এই সিল করা, এর বেশি বা কমে কখনো বদলাবে না।`,
+                render: vw => renderArrayZone(vw, arrayData, -1)
+            }];
+            arrayData.forEach((v, i) => {
+                steps.push({
+                    node: i + 1, phase: `iteration ${i}`, activeLines: [3, 4],
+                    console: `<span class="hl">range myArr</span> — iteration <span class="hl">${i}</span>: <span class="hl">i = ${i}</span>, <span class="hl">value = "${v}"</span>। খেয়াল করো, <span class="hl">value</span> আসলে array element-এর <span class="hl-stack">কপি</span> — সরাসরি reference না।`,
+                    render: vw => renderArrayZone(vw, arrayData, i),
+                    output: `Index: ${i}, Value: ${v}`
+                });
+            });
+            steps.push({
+                node: 4, phase: 'loop finished', activeLines: [5],
+                console: `লুপ শেষ — ৩টা element-ই একবার iterate হলো। <span class="hl-stack">Array</span> এর সাইজ ফিক্সড থাকায় এই লুপ compile-time-এই জানে ঠিক ৩ বার চলবে।`,
+                render: vw => renderArrayZone(vw, arrayData, 3),
+                takeaway: { title: 'Array টেকঅ্যাওয়ে', detail: 'Fixed size, value copy on range, contiguous memory — যখন সাইজ নিশ্চিত (সপ্তাহের ৭ দিন, ১২ মাস) তখনই ব্যবহার করো।' }
+            });
+            return steps;
+        }
+        function renderArrayZone(vw, data, activeIdx) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">contiguous memory — [3]string</div>
+      <div class="cell-row">
+        ${data.map((v, i) => `
+          <div class="cell ${i === activeIdx ? 'active' : (i < activeIdx ? 'done' : '')}">
+            <div class="idx">[${i}]</div>
+            <div class="val">"${v}"</div>
+          </div>`).join('')}
+      </div>
+      <div class="info-strip">size locked at compile time → len(myArr) = ${data.length}, cap is irrelevant for arrays</div>
+    </div>`;
+        }
+
+        /* ---------------- SLICE ---------------- */
+        const sliceCode = [
+            { html: '<span class="com">// 2. SLICE — dynamic window over a hidden array</span>' },
+            { html: 'colors := []<span class="type">string</span>{<span class="str">"red"</span>, <span class="str">"green"</span>, <span class="str">"blue"</span>}' },
+            { html: '' },
+            { html: 'colors = <span class="fn">append</span>(colors, <span class="str">"yellow"</span>, <span class="str">"purple"</span>)' },
+            { html: '<span class="com">// underlying array full → Go copies to a new, bigger array</span>' },
+            { html: '' },
+            { html: '<span class="kw">for</span> i, color := <span class="kw">range</span> colors {' },
+            { html: '    fmt.Printf(<span class="str">"Index: %d, Color: %s\\n"</span>, i, color)' },
+            { html: '}' },
+        ];
+        function sliceSteps() {
+            const initial = ['red', 'green', 'blue'];
+            const grown = ['red', 'green', 'blue', 'yellow', 'purple'];
+            const steps = [
+                {
+                    node: 0, phase: 'slice header created', activeLines: [1],
+                    console: `<span class="hl-heap">colors</span> একটা slice header — নিজে ডাটা ধরে না, বরং <span class="hl">len=3, cap=3</span> সহ heap-এ থাকা একটা underlying array-কে point করে।`,
+                    render: vw => renderSliceZone(vw, initial, 3, 3, -1, false)
+                },
+                {
+                    node: 1, phase: 'append triggers growth', activeLines: [3, 4],
+                    console: `<span class="hl">append(colors, "yellow", "purple")</span> — পুরোনো array-র capacity (৩) ভরে গেছে! Go নিজে থেকে <span class="hl-heap">ডাবল সাইজের নতুন array</span> বানিয়ে পুরোনো ডাটা কপি করে নিলো, তারপর নতুন element যুক্ত করলো। এখন <span class="hl">len=5, cap=6</span>।`,
+                    render: vw => renderSliceZone(vw, grown, 5, 6, -1, true)
+                },
+            ];
+            grown.forEach((v, i) => {
+                steps.push({
+                    node: i + 2, phase: `iteration ${i}`, activeLines: [6, 7],
+                    console: `<span class="hl">range colors</span> — iteration <span class="hl">${i}</span>: <span class="hl">color = "${v}"</span>। range নতুন (growth-পরবর্তী) underlying array-র উপরেই চলছে।`,
+                    render: vw => renderSliceZone(vw, grown, 5, 6, i, false),
+                    output: `Index: ${i}, Color: ${v}`
+                });
+            });
+            steps.push({
+                node: 7, phase: 'loop finished', activeLines: [8],
+                console: `লুপ শেষ — <span class="hl-heap">slice</span> এর আসল power: append-এর মাধ্যমে runtime-এ বাড়তে পারে, range স্বয়ংক্রিয়ভাবে current length অনুযায়ী চলে।`,
+                render: vw => renderSliceZone(vw, grown, 5, 6, 4, false),
+                takeaway: { title: 'Slice টেকঅ্যাওয়ে', detail: 'Dynamic length, hidden underlying array, capacity doubling on growth — ৯৯% সময় list/sequence-এর জন্য এটাই ব্যবহার হয়।' }
+            });
+            return steps;
+        }
+        function renderSliceZone(vw, data, len, cap, activeIdx, justGrew) {
+            const slots = [];
+            for (let i = 0; i < cap; i++) {
+                if (i < data.length) {
+                    slots.push({ v: data[i], grown: justGrew && i >= 3 });
+                } else {
+                    slots.push({ v: null });
+                }
+            }
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">slice header (stack-like)</div>
+      <div class="cell-row">
+        <div class="cell"><div class="idx">ptr</div><div class="val">→ array</div></div>
+        <div class="cell"><div class="idx">len</div><div class="val">${len}</div></div>
+        <div class="cell"><div class="idx">cap</div><div class="val">${cap}</div></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">underlying array — heap</div>
+      <div class="cell-row">
+        ${slots.map((s, i) => {
+                if (s.v === null) return `<div class="cell ghost"><div class="idx">[${i}]</div><div class="val">·</div></div>`;
+                const cls = i === activeIdx ? 'active' : (s.grown ? 'new-grow' : (i < activeIdx ? 'done' : ''));
+                return `<div class="cell ${cls}"><div class="idx">[${i}]</div><div class="val">"${s.v}"</div></div>`;
+            }).join('')}
+      </div>
+      <div class="info-strip">${justGrew ? 'growth event: old array (cap 3) copied into new array (cap 6)' : `len=${len} elements active, ${cap - len} spare capacity slot(s)`}</div>
+    </div>`;
+        }
+
+        /* ---------------- STRING ---------------- */
+        const stringCode = [
+            { html: '<span class="com">// 3. STRING — read-only slice of bytes</span>' },
+            { html: 'name := <span class="str">"Next Level"</span>' },
+            { html: '' },
+            { html: 'byteSlice := []<span class="type">byte</span>(name)' },
+            { html: 'fmt.Printf(<span class="str">"String as Byte Slice: %v\\n"</span>, byteSlice)' },
+            { html: '' },
+            { html: '<span class="kw">for</span> i, runeValue := <span class="kw">range</span> name {' },
+            { html: '    fmt.Printf(<span class="str">"Index: %d, Character: %c (Rune: %d)\\n"</span>, i, runeValue, runeValue)' },
+            { html: '}' },
+        ];
+        const stringVal = "Next Level";
+        function stringSteps() {
+            const bytes = Array.from(stringVal).map(c => c.charCodeAt(0));
+            const chars = Array.from(stringVal);
+            const steps = [
+                {
+                    node: 0, phase: 'string as bytes', activeLines: [1],
+                    console: `<span class="hl">name := "Next Level"</span> — Go-তে string আসলে <span class="hl-stack">read-only []byte</span>। প্রতিটা ক্যারেক্টারের UTF-8/ASCII numeric value মেমোরিতে পাশাপাশি বসে থাকে।`,
+                    render: vw => renderStringZone(vw, chars, bytes, -1)
+                },
+                {
+                    node: 1, phase: 'byte conversion', activeLines: [3, 4],
+                    console: `<span class="hl">[]byte(name)</span> — string-টাকে একটা mutable byte slice-এ রূপান্তর করা হলো। এখন প্রতিটা byte সরাসরি index দিয়ে বদলানো যাবে (কিন্তু আসল <span class="hl">name</span> string এখনো অপরিবর্তিত, immutable)।`,
+                    render: vw => renderStringZone(vw, chars, bytes, -1)
+                },
+            ];
+            chars.forEach((c, i) => {
+                steps.push({
+                    node: i + 2, phase: `iteration ${i}`, activeLines: [6, 7],
+                    console: `<span class="hl">range name</span> — iteration: <span class="hl">i = ${i}</span>, <span class="hl">rune = '${c}'</span> (numeric: <span class="hl">${c.charCodeAt(0)}</span>)। ASCII ক্যারেক্টারের জন্য byte index আর rune index এক, কিন্তু multi-byte UTF-8 ক্যারেক্টার (যেমন বাংলা) থাকলে index gap তৈরি হতো।`,
+                    render: vw => renderStringZone(vw, chars, bytes, i),
+                    output: `Index: ${i}, Character: ${c} (Rune: ${c.charCodeAt(0)})`
+                });
+            });
+            steps.push({
+                node: chars.length + 2, phase: 'loop finished', activeLines: [8],
+                console: `লুপ শেষ। মনে রাখার মতো জিনিস: <span class="hl">name[0] = 'Z'</span> সরাসরি লেখা <span class="hl-stack">সম্ভব না</span> — string immutable, modify করতে হলে আগে []byte বা []rune-এ কনভার্ট করতে হবে।`,
+                render: vw => renderStringZone(vw, chars, bytes, chars.length - 1),
+                takeaway: { title: 'String টেকঅ্যাওয়ে', detail: 'Immutable []byte under the hood. ASCII-এ byte index = rune index, কিন্তু multi-byte UTF-8 ক্যারেক্টারে তা ভিন্ন হয়।' }
+            });
+            return steps;
+        }
+        function renderStringZone(vw, chars, bytes, activeIdx) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">rune view (what range gives you)</div>
+      <div class="cell-row">
+        ${chars.map((c, i) => `<div class="cell rune-cell ${i === activeIdx ? 'active' : (i < activeIdx ? 'done' : '')}"><div class="idx">[${i}]</div><div class="val">${c == ' ' ? '␣' : c}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">byte view (underlying memory)</div>
+      <div class="cell-row">
+        ${bytes.map((b, i) => `<div class="cell byte-cell ${i === activeIdx ? 'active' : (i < activeIdx ? 'done' : '')}"><div class="idx">[${i}]</div><div class="val">${b}</div></div>`).join('')}
+      </div>
+      <div class="info-strip">ASCII string হওয়ায় byte index = rune index (১:১ মিল), multi-byte char থাকলে মিলতো না</div>
+    </div>`;
+        }
+
+        /* ---------------- MAP ---------------- */
+        const mapCode = [
+            { html: '<span class="com">// 4. MAP — unordered key-value hash table</span>' },
+            { html: 'myMap := <span class="kw">map</span>[<span class="type">string</span>]<span class="type">string</span>{' },
+            { html: '    <span class="str">"name"</span>:    <span class="str">"Ishtiaq"</span>,' },
+            { html: '    <span class="str">"success"</span>: <span class="str">"ok"</span>,' },
+            { html: '    <span class="str">"role"</span>:    <span class="str">"Developer"</span>,' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">for</span> key, value := <span class="kw">range</span> myMap {' },
+            { html: '    fmt.Printf(<span class="str">"Key: %s -> Value: %s\\n"</span>, key, value)' },
+            { html: '}' },
+        ];
+        const mapEntries = [['name', 'Ishtiaq'], ['success', 'ok'], ['role', 'Developer']];
+        // a fixed "shuffled" order to demonstrate non-determinism, different from insertion order
+        const shuffledOrder = [1, 2, 0];
+        function mapSteps() {
+            const steps = [{
+                node: 0, phase: 'map initialized', activeLines: [1, 2, 3, 4, 5],
+                console: `<span class="hl-map">myMap</span> একটা hash table — ৩টা key-value pair দিয়ে initialize হলো। <span class="hl">make()</span> বা literal <span class="hl">{}</span> দিয়ে initialize না করলে এটা <span class="hl-stack">nil map</span> থাকতো এবং write করলে panic হতো।`,
+                render: vw => renderMapZone(vw, mapEntries, [])
+            }];
+            shuffledOrder.forEach((origIdx, step) => {
+                const visited = shuffledOrder.slice(0, step + 1);
+                steps.push({
+                    node: step + 1, phase: `iteration ${step}`, activeLines: [7, 8],
+                    console: `<span class="hl">range myMap</span> — iteration <span class="hl">${step}</span>: key=<span class="hl-map">"${mapEntries[origIdx][0]}"</span>। খেয়াল করো, এটা insertion order (name→success→role) মানছে না — Go ইচ্ছাকৃতভাবে map iteration-এর <span class="hl-stack">order randomize</span> করে, যাতে কেউ ভুলবশত order-এর উপর নির্ভর করে কোড না লেখে।`,
+                    render: vw => renderMapZone(vw, mapEntries, visited),
+                    output: `Key: ${mapEntries[origIdx][0]} -> Value: ${mapEntries[origIdx][1]}`
+                });
+            });
+            steps.push({
+                node: 4, phase: 'loop finished', activeLines: [9],
+                console: `লুপ শেষ — তিনটা entry-ই visit হয়েছে, কিন্তু order ছিল <span class="hl-map">${shuffledOrder.map(i => mapEntries[i][0]).join(' → ')}</span>, insertion order না। প্রতিবার রান করলে এই order বদলেও যেতে পারে।`,
+                render: vw => renderMapZone(vw, mapEntries, shuffledOrder),
+                takeaway: { title: 'Map টেকঅ্যাওয়ে', detail: 'Unordered by design — কখনো iteration order-এর উপর নির্ভর করো না। Key দিয়ে O(1) lookup-এর জন্য সবচেয়ে ভালো।' }
+            });
+            return steps;
+        }
+        function renderMapZone(vw, entries, visitedOrigIdxs) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">hash buckets (insertion order shown, NOT iteration order)</div>
+      <div class="map-row">
+        ${entries.map((e, i) => {
+                const visitPos = visitedOrigIdxs.indexOf(i);
+                const isActive = visitPos === visitedOrigIdxs.length - 1 && visitPos !== -1;
+                const isDone = visitPos !== -1 && !isActive;
+                const cls = isActive ? 'active' : (isDone ? 'done' : '');
+                const badge = visitPos !== -1 ? `<div class="map-order-badge">${visitPos + 1}</div>` : '';
+                return `<div class="map-cell ${cls}">${badge}<div class="mk">"${e[0]}"</div><div class="mv">→ "${e[1]}"</div></div>`;
+            }).join('')}
+      </div>
+      <div class="info-strip">badge নম্বর = visit হওয়ার ক্রম (iteration order) — খেয়াল করো এটা box-এর position-এর সাথে মিলছে না</div>
+    </div>`;
+        }
+
+        /* ---------------- CHANNEL ---------------- */
+        const channelCode = [
+            { html: '<span class="com">// 5. CHANNEL — safe pipe between goroutines</span>' },
+            { html: 'messages := <span class="fn">make</span>(<span class="kw">chan</span> <span class="type">string</span>)' },
+            { html: '' },
+            { html: '<span class="kw">go</span> <span class="kw">func</span>() {' },
+            { html: '    fmt.Println(<span class="str">"[Goroutine] Working... waiting 2s"</span>)' },
+            { html: '    time.Sleep(<span class="type">2</span> * time.Second)' },
+            { html: '    messages &lt;- <span class="str">"Hello from Background Goroutine!"</span>' },
+            { html: '}()' },
+            { html: '' },
+            { html: 'fmt.Println(<span class="str">"[Main] Waiting (Blocking)..."</span>)' },
+            { html: 'receivedMsg := &lt;-messages' },
+            { html: 'fmt.Printf(<span class="str">"[Main] I got the data: %s\\n"</span>, receivedMsg)' },
+        ];
+        function channelSteps() {
+            return [
+                {
+                    node: 0, phase: 'channel created', activeLines: [1],
+                    console: `<span class="hl">messages := make(chan string)</span> — একটা unbuffered pipe তৈরি হলো। এখনো কেউ পাঠাচ্ছেও না, পাচ্ছেও না।`,
+                    render: vw => renderChannelZone(vw, 'idle', 0)
+                },
+                {
+                    node: 1, phase: 'goroutine launched', activeLines: [3, 4, 5],
+                    console: `<span class="hl">go func(){...}()</span> — main()-এর সমান্তরালে (parallel) একটা নতুন <span class="hl-heap">goroutine</span> চালু হলো। এটা এখন background-এ ২ সেকেন্ড sleep করছে।`,
+                    render: vw => renderChannelZone(vw, 'goroutine-sleeping', 0)
+                },
+                {
+                    node: 2, phase: 'main blocks on receive', activeLines: [9, 10],
+                    console: `<span class="hl-code">main()</span> এখন <span class="hl">&lt;-messages</span> লাইনে এসে <span class="hl-stack">block</span> হয়ে গেলো — যতক্ষণ না কেউ channel-এ ডাটা পাঠায়, main thread এখানেই অপেক্ষা করবে। এটাই channel-এর "synchronization" ক্ষমতা।`,
+                    render: vw => renderChannelZone(vw, 'main-blocked', 1.0)
+                },
+                {
+                    node: 3, phase: 'goroutine sends', activeLines: [6],
+                    console: `২ সেকেন্ড পর goroutine ঘুম থেকে উঠে <span class="hl">messages &lt;- "Hello..."</span> — channel-এর ভেতর দিয়ে ডাটা পাঠালো।`,
+                    render: vw => renderChannelZone(vw, 'sending', 1.0)
+                },
+                {
+                    node: 4, phase: 'main receives, unblocks', activeLines: [10, 11],
+                    console: `<span class="hl-code">main()</span> ডাটা পেয়ে <span class="hl-heap">unblock</span> হলো — <span class="hl">receivedMsg</span>-এ ভ্যালু চলে এলো এবং এক্সিকিউশন আবার এগিয়ে চললো।`,
+                    render: vw => renderChannelZone(vw, 'received', 1.0),
+                    output: `[Main] I got the data: Hello from Background Goroutine!`,
+                    takeaway: { title: 'Channel টেকঅ্যাওয়ে', detail: 'এটা সরাসরি range-এর উপর নয়, কিন্তু একই ফাইলের concurrency primitive — channel একাধিক goroutine-এর মধ্যে নিরাপদ, blocking ডাটা আদান-প্রদানের পাইপলাইন।' }
+                }
+            ];
+        }
+        function renderChannelZone(vw, phase, blockProgress) {
+            const mainLeft = phase === 'idle' ? 8 : (phase === 'goroutine-sleeping' ? 8 : (phase === 'main-blocked' || phase === 'sending' ? '46%' : '88%'));
+            const goLeft = phase === 'idle' ? 8 : (phase === 'goroutine-sleeping' ? '40%' : (phase === 'sending' ? '78%' : '88%'));
+            const showBlocked = phase === 'main-blocked' || phase === 'sending' || phase === 'received';
+            const showPayload = phase === 'sending' || phase === 'received';
+            const payloadLeft = phase === 'sending' ? '70%' : (phase === 'received' ? '8px' : '8px');
+
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">main() goroutine lane</div>
+      <div class="lane-track">
+        <div class="lane-label">main()</div>
+        <div class="lane-blocked-zone ${showBlocked ? 'show' : ''}" style="left:40%; width:48%;"></div>
+        <div class="lane-tag ${showBlocked ? 'show' : ''}" style="left:64%;">blocked on &lt;-messages</div>
+        <div class="lane-runner main" style="left:${mainLeft};"></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">background goroutine lane</div>
+      <div class="lane-track">
+        <div class="lane-label">go func()</div>
+        <div class="lane-runner goroutine" style="left:${goLeft};"></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">channel pipe — unbuffered chan string</div>
+      <div class="channel-pipe">
+        <span class="pipe-label">messages</span>
+        <div class="channel-payload ${showPayload ? 'show' : ''}" style="left:${payloadLeft};">"Hello from Background Goroutine!"</div>
+      </div>
+      <div class="info-strip">${phase === 'idle' ? 'channel তৈরি, কোনো activity নেই' :
+                    phase === 'goroutine-sleeping' ? 'goroutine চলছে — time.Sleep(2s) এর মধ্যে আছে' :
+                        phase === 'main-blocked' ? 'main() block করে অপেক্ষা করছে, goroutine এখনো sleep করছে' :
+                            phase === 'sending' ? 'goroutine ডাটা পাঠাচ্ছে channel-এর মধ্য দিয়ে' :
+                                'main() ডাটা receive করে আবার চলতে শুরু করেছে'
+                }</div>
+    </div>`;
+        }
+
+        /* ---------------- INTEGER RANGE ---------------- */
+        const intCode = [
+            { html: '<span class="com">// Bonus: Integer Range (Go 1.22+)</span>' },
+            { html: '<span class="kw">for</span> i := <span class="kw">range</span> <span class="type">5</span> {' },
+            { html: '    fmt.Printf(<span class="str">"Tick: %d\\n"</span>, i)' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="com">// equivalent to the classic C-style loop:</span>' },
+            { html: '<span class="com">// for i := 0; i < 5; i++ { ... }</span>' },
+        ];
+        function intSteps() {
+            const n = 5;
+            const steps = [{
+                node: 0, phase: 'range over int', activeLines: [1],
+                console: `<span class="hl">range 5</span> — Go 1.22 থেকে range সরাসরি একটা integer-এর উপরেও চলতে পারে। এটা কোনো collection iterate করছে না, বরং <span class="hl">0</span> থেকে <span class="hl">n-1</span> পর্যন্ত গুনছে — ঠিক classic <span class="hl">for i:=0; i&lt;n; i++</span> এর মতোই, কিন্তু shorter syntax।`,
+                render: vw => renderIntZone(vw, n, -1)
+            }];
+            for (let i = 0; i < n; i++) {
+                steps.push({
+                    node: i + 1, phase: `tick ${i}`, activeLines: [1, 2],
+                    console: `iteration: <span class="hl">i = ${i}</span>। শুধু একটা counter — কোনো underlying array/slice/map নেই।`,
+                    render: vw => renderIntZone(vw, n, i),
+                    output: `Tick: ${i}`
+                });
+            }
+            steps.push({
+                node: n + 1, phase: 'loop finished', activeLines: [3],
+                console: `লুপ শেষ — ৫ বার চললো (<span class="hl">0,1,2,3,4</span>)। শুধু একটা bound প্রয়োজন হলে এই syntax C-style লুপের চেয়ে readable।`,
+                render: vw => renderIntZone(vw, n, n - 1),
+                takeaway: { title: 'Integer Range টেকঅ্যাওয়ে', detail: 'Go 1.22+ ফিচার — fixed কতবার লুপ চালাতে হবে জানলে for i:=0;i<n;i++ এর সংক্ষিপ্ত বিকল্প।' }
+            });
+            return steps;
+        }
+        function renderIntZone(vw, n, activeIdx) {
+            const cells = [];
+            for (let i = 0; i < n; i++) cells.push(i);
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">range 5 — pure counter, no backing structure</div>
+      <div class="int-track">
+        ${cells.map(i => `<div class="int-cell ${i === activeIdx ? 'active' : (i < activeIdx ? 'done' : '')}">${i}</div>`).join('')}
+      </div>
+      <div class="info-strip">i বাড়তে থাকে 0 থেকে n-1 পর্যন্ত, কোনো memory structure ছাড়াই</div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           TOPIC REGISTRY
+        ========================================================================= */
+        const topics = {
+            array: { label: 'Array', filename: 'array_demo.go', code: arrayCode, stepsFn: arraySteps, visLabel: 'Contiguous Memory' },
+            slice: { label: 'Slice', filename: 'slice_demo.go', code: sliceCode, stepsFn: sliceSteps, visLabel: 'Header + Underlying Array' },
+            string: { label: 'String', filename: 'string_demo.go', code: stringCode, stepsFn: stringSteps, visLabel: 'Byte / Rune View' },
+            map: { label: 'Map', filename: 'map_demo.go', code: mapCode, stepsFn: mapSteps, visLabel: 'Hash Buckets' },
+            channel: { label: 'Channel', filename: 'channel_demo.go', code: channelCode, stepsFn: channelSteps, visLabel: 'Goroutine Lanes' },
+            intrange: { label: 'Int Range', filename: 'int_range_demo.go', code: intCode, stepsFn: intSteps, visLabel: 'Pure Counter' },
+        };
+        const topicOrder = ['array', 'slice', 'string', 'map', 'channel', 'intrange'];
+
+        let activeTopic = 'array';
+        let currentStep = -1;
+        let activeSteps = [];
+
+        /* =========================================================================
+           RENDER: TABS
+        ========================================================================= */
+        const topicTabsEl = document.getElementById('topicTabs');
+        function renderTopicTabs() {
+            topicTabsEl.innerHTML = topicOrder.map(key => {
+                const t = topics[key];
+                return `<div class="topic-tab ${key === activeTopic ? 'active' : ''}" id="ttab-${key}" onclick="switchTopic('${key}')">
+      <span class="tdot" style="background:${ACCENTS[key]}"></span>${t.label}
+    </div>`;
+            }).join('');
+        }
+        renderTopicTabs();
+
+        /* =========================================================================
+           RENDER: CODE
+        ========================================================================= */
+        const codeView = document.getElementById('codeView');
+        function renderCode(topicKey) {
+            const t = topics[topicKey];
+            codeView.innerHTML = t.code.map((l, i) => `<div class="line" id="line-${i}"><span class="ln">${i + 1}</span>${l.html}</div>`).join('');
+            document.getElementById('filenameTag').textContent = t.filename;
+            document.getElementById('visLabel').textContent = t.visLabel;
+        }
+
+        function highlightLines(activeLines, dimLines) {
+            document.querySelectorAll('.line').forEach(el => el.classList.remove('active', 'faded'));
+            (dimLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('faded'); });
+            (activeLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('active'); });
+        }
+
+        /* =========================================================================
+           RENDER: STEPPER
+        ========================================================================= */
+        const stepTrackInner = document.getElementById('stepTrackInner');
+        function renderStepperNodes(steps) {
+            stepTrackInner.innerHTML = steps.map((s, i) => `
+    <div class="step" id="step-${i}">
+      <div class="step-node">${i + 1}</div>
+      <div class="step-label">${s.phase}</div>
+    </div>`).join('');
+        }
+
+        function updateStepper(idx, total) {
+            const accent = ACCENTS[activeTopic];
+            document.querySelectorAll('.step').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                const node = el.querySelector('.step-node');
+                node.style.borderColor = ''; node.style.background = ''; node.style.color = '';
+                if (i < idx) { el.classList.add('done'); node.style.borderColor = accent; node.style.color = accent; }
+                if (i === idx) { el.classList.add('active'); node.style.borderColor = accent; node.style.background = accent; node.style.color = '#0a0e14'; }
+            });
+            const pct = total > 1 ? (idx / (total - 1)) * 100 : 0;
+            const bar = document.getElementById('stepperProgress');
+            bar.style.width = (idx < 0 ? 0 : pct) + '%';
+            bar.style.background = accent;
+        }
+
+        /* =========================================================================
+           MAIN RENDER STEP
+        ========================================================================= */
+        const visWrap = document.getElementById('visWrap');
+        function renderStep(step) {
+            highlightLines(step.activeLines, step.dimLines);
+            document.getElementById('phaseTag').textContent = step.phase;
+            step.render(visWrap, currentStep);
+
+            document.getElementById('consoleMsg').innerHTML = step.console;
+
+            updateStepper(step.node, activeSteps.length);
+
+            const extraRow = document.getElementById('extraRow');
+            extraRow.innerHTML = '';
+            if (step.output) {
+                const wrap = document.createElement('div');
+                wrap.className = 'output-row';
+                const chip = document.createElement('div');
+                chip.className = 'output-chip';
+                chip.textContent = step.output;
+                wrap.appendChild(chip);
+                extraRow.appendChild(wrap);
+            }
+            if (step.takeaway) {
+                const card = document.createElement('div');
+                card.className = 'takeaway-card';
+                card.innerHTML = `<div class="tt">${step.takeaway.title}</div><div class="td">${step.takeaway.detail}</div>`;
+                extraRow.appendChild(card);
+            }
+        }
+
+        /* =========================================================================
+           CONTROLS
+        ========================================================================= */
+        function nextStep() {
+            if (currentStep < activeSteps.length - 1) {
+                currentStep++;
+                renderStep(activeSteps[currentStep]);
+                if (currentStep === activeSteps.length - 1) {
+                    document.getElementById('btnNext').disabled = true;
+                }
+            }
+        }
+
+        function resetSim() {
+            currentStep = -1;
+            document.getElementById('extraRow').innerHTML = '';
+            highlightLines([], []);
+            document.getElementById('phaseTag').textContent = 'idle';
+            updateStepper(-1, activeSteps.length);
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('consoleMsg').innerHTML = 'একটা topic বেছে নিয়ে <b>Next step</b> চাপো।';
+            // render the "before loop" state if first step exists, else blank
+            visWrap.innerHTML = '';
+            if (activeSteps[0]) {
+                activeSteps[0].render(visWrap, -1);
+            }
+        }
+
+        function switchTopic(key) {
+            activeTopic = key;
+            renderTopicTabs();
+            renderCode(key);
+            activeSteps = topics[key].stepsFn();
+            renderStepperNodes(activeSteps);
+            resetSim();
+        }
+
+        /* init */
+        switchTopic('array');
+    </script>
+</body>
+
+</html>
