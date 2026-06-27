@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Closures Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e14;
+            --panel: #11161f;
+            --panel-2: #0d121a;
+            --line: #232b38;
+            --line-soft: #1a212c;
+            --text: #c7d0dc;
+            --text-dim: #6b7686;
+            --text-bright: #eef2f7;
+
+            --stack: #ff8a7a;
+            --stack-dim: #5a3934;
+            --heap: #4fd8a8;
+            --heap-dim: #2f4a3f;
+            --code: #8aa6ff;
+            --code-dim: #36406b;
+            --pointer: #ffcc66;
+
+            --kw: #ff8a7a;
+            --type: #ffb454;
+            --str: #4fd8a8;
+            --com: #5b6677;
+            --fn: #8aa6ff;
+
+            --sans: 'Space Grotesk', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 28px 40px;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(138, 166, 255, 0.08), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(79, 216, 168, 0.06), transparent 40%),
+                var(--bg);
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ---------- Header ---------- */
+        .masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            max-width: 1440px;
+            margin: 0 auto 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        .masthead h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-bright);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .masthead h1 .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--heap);
+            box-shadow: 0 0 12px var(--heap);
+        }
+
+        .masthead .sub {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 0.92fr 1.55fr;
+            gap: 18px;
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        /* ---------- Code panel ---------- */
+        .code-panel .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .traffic {
+            display: flex;
+            gap: 6px;
+        }
+
+        .traffic span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .traffic span:nth-child(1) {
+            background: #ff5f57;
+        }
+
+        .traffic span:nth-child(2) {
+            background: #febc2e;
+        }
+
+        .traffic span:nth-child(3) {
+            background: #28c840;
+        }
+
+        .filename {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .code-container {
+            font-family: var(--mono);
+            line-height: 1.75;
+            font-size: 14px;
+            padding: 16px 0 20px;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .line {
+            position: relative;
+            padding: 1px 18px 1px 50px;
+            transition: background-color .25s ease, border-color .25s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .line .ln {
+            position: absolute;
+            left: 16px;
+            width: 24px;
+            text-align: right;
+            color: #3a4250;
+            font-size: 12px;
+            user-select: none;
+        }
+
+        .line.active {
+            background: linear-gradient(90deg, rgba(138, 166, 255, 0.14), rgba(138, 166, 255, 0.03) 70%);
+            border-left-color: var(--code);
+        }
+
+        .line.faded {
+            opacity: 0.42;
+        }
+
+        .line .tag {
+            margin-left: 10px;
+            font-size: 11px;
+            color: var(--pointer);
+            opacity: 0.85;
+        }
+
+        .kw {
+            color: var(--kw);
+            font-weight: 600;
+        }
+
+        .type {
+            color: var(--type);
+        }
+
+        .com {
+            color: var(--com);
+            font-style: italic;
+        }
+
+        .fn {
+            color: var(--fn);
+        }
+
+        .str {
+            color: var(--str);
+        }
+
+        /* ---------- RAM layout ---------- */
+        .ram-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .ram-head .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .ram-head .phase {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.08);
+            border: 1px solid rgba(255, 204, 102, 0.25);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .ram-wrap {
+            position: relative;
+            padding: 18px;
+        }
+
+        .ram-layout {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            position: relative;
+        }
+
+        .segment {
+            position: relative;
+            border-radius: 8px;
+            padding: 12px 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            min-height: 420px;
+            background: var(--panel-2);
+        }
+
+        .segment.stack {
+            border: 1.5px dashed var(--stack-dim);
+        }
+
+        .segment.heap {
+            border: 1.5px solid var(--heap-dim);
+        }
+
+        .segment.codeseg {
+            border: 1.5px solid var(--code-dim);
+        }
+
+        .segment-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 2px;
+        }
+
+        .segment-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.25;
+        }
+
+        .stack .segment-title {
+            color: var(--stack);
+        }
+
+        .heap .segment-title {
+            color: var(--heap);
+        }
+
+        .codeseg .segment-title {
+            color: var(--code);
+        }
+
+        .stack-frames,
+        .heap-blocks,
+        .code-blocks {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        /* stack grows upward visually: newest frame on top, but we want newest at bottom of call,
+     so we anchor frames to bottom of the segment */
+        .stack-frames {
+            margin-top: auto;
+        }
+
+        /* ---------- Memory blocks ---------- */
+        .mem-block {
+            border-radius: 7px;
+            padding: 9px 11px 10px;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            background: #161d27;
+            animation: blockIn .38s cubic-bezier(.25, 1, .5, 1);
+            position: relative;
+        }
+
+        @keyframes blockIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .mem-block .blk-title {
+            font-weight: 700;
+            font-size: 11.5px;
+            letter-spacing: 0.03em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .mem-block .blk-addr {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .mem-block .row {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            color: var(--text);
+        }
+
+        .mem-block .row .k {
+            color: var(--text-dim);
+        }
+
+        .mem-block .row .v {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .mem-block .row .v.nil {
+            color: var(--text-dim);
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .mem-block .row .v.ptr {
+            color: var(--pointer);
+        }
+
+        .mem-block .row .v.pulse {
+            animation: pulseVal .55s ease;
+        }
+
+        @keyframes pulseVal {
+            0% {
+                color: var(--pointer);
+                text-shadow: 0 0 10px rgba(255, 204, 102, 0.7);
+            }
+
+            100% {
+                color: var(--text-bright);
+                text-shadow: none;
+            }
+        }
+
+        .stack-frame {
+            border-left: 3px solid var(--stack);
+        }
+
+        .heap-frame {
+            border-left: 3px solid var(--heap);
+        }
+
+        .code-frame {
+            border-left: 3px solid var(--code);
+            opacity: 0.92;
+        }
+
+        .closure-frame {
+            border-left: 3px solid var(--pointer);
+            background: linear-gradient(135deg, #1b2118, #161d27);
+        }
+
+        .closure-frame .blk-title {
+            color: var(--pointer);
+        }
+
+        /* destroyed stack frame */
+        .mem-block.destroyed {
+            opacity: 0.32;
+            border-left-color: var(--text-dim);
+            background: repeating-linear-gradient(135deg,
+                    #161d27,
+                    #161d27 8px,
+                    #11161f 8px,
+                    #11161f 16px);
+        }
+
+        .mem-block.destroyed .blk-title {
+            color: var(--text-dim);
+            text-decoration: line-through;
+        }
+
+        .mem-block.destroyed::after {
+            content: 'POPPED';
+            position: absolute;
+            top: 6px;
+            right: 9px;
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
+        .mem-block.popping {
+            animation: popOut .45s cubic-bezier(.5, -0.3, .75, .1) forwards;
+        }
+
+        @keyframes popOut {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            60% {
+                opacity: 0.5;
+                transform: translateY(8px) scale(0.97);
+            }
+
+            100% {
+                opacity: 0.32;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .escape-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--heap);
+            background: rgba(79, 216, 168, 0.1);
+            border: 1px solid rgba(79, 216, 168, 0.35);
+            padding: 1px 7px;
+            border-radius: 20px;
+            letter-spacing: 0.03em;
+        }
+
+        /* ---------- SVG arrow overlay ---------- */
+        .arrow-overlay {
+            position: absolute;
+            inset: 18px;
+            pointer-events: none;
+            z-index: 5;
+            overflow: visible;
+        }
+
+        .arrow-overlay path {
+            fill: none;
+            stroke: var(--pointer);
+            stroke-width: 2;
+            stroke-dasharray: 5 4;
+            filter: drop-shadow(0 0 4px rgba(255, 204, 102, 0.5));
+            stroke-dashoffset: 200;
+            opacity: 0;
+        }
+
+        .arrow-overlay path.show {
+            animation: drawArrow .6s ease forwards;
+        }
+
+        @keyframes drawArrow {
+            0% {
+                stroke-dashoffset: 200;
+                opacity: 0;
+            }
+
+            15% {
+                opacity: 1;
+            }
+
+            100% {
+                stroke-dashoffset: 0;
+                opacity: 1;
+            }
+        }
+
+        .arrow-overlay circle {
+            fill: var(--pointer);
+            opacity: 0;
+        }
+
+        .arrow-overlay circle.show {
+            animation: dotIn .3s ease forwards .55s;
+        }
+
+        @keyframes dotIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* ---------- Bottom panel ---------- */
+        .bottom-panel {
+            grid-column: 1 / -1;
+            padding: 20px 22px;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+            margin-bottom: 24px;
+            padding: 0 10px;
+        }
+
+        .stepper::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background: var(--line);
+            z-index: 1;
+        }
+
+        .stepper .progress {
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--stack), var(--pointer), var(--heap));
+            z-index: 2;
+            transition: width .4s cubic-bezier(.25, 1, .5, 1);
+            width: 0%;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 7px;
+            z-index: 3;
+            width: 90px;
+        }
+
+        .step-node {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            border: 2px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .step.active .step-node {
+            border-color: var(--pointer);
+            background: var(--pointer);
+            color: #1a1408;
+            box-shadow: 0 0 14px rgba(255, 204, 102, 0.55);
+        }
+
+        .step.done .step-node {
+            border-color: var(--heap);
+            background: transparent;
+            color: var(--heap);
+        }
+
+        .step .step-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
+            letter-spacing: 0.02em;
+        }
+
+        .step.active .step-label {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 13.5px;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #3a4555;
+            background: #161d27;
+            transform: translateY(-1px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #btnNext {
+            background: linear-gradient(135deg, #6f8cff, #8aa6ff);
+            color: #0a0e14;
+            border-color: transparent;
+        }
+
+        #btnNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+            background: linear-gradient(135deg, #6f8cff, #8aa6ff);
+        }
+
+        #btnCallNext {
+            background: linear-gradient(135deg, #2fae84, #4fd8a8);
+            color: #06140f;
+            border-color: transparent;
+        }
+
+        #btnCallNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        #btnCallNext .count-badge {
+            background: rgba(0, 0, 0, 0.18);
+            padding: 1px 7px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-family: var(--mono);
+        }
+
+        .console-box {
+            background: #05070a;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--code);
+            padding: 14px 16px;
+            border-radius: 7px;
+            font-size: 14px;
+            line-height: 1.65;
+            min-height: 54px;
+            transition: border-left-color .3s ease;
+        }
+
+        .console-box.done-flash {
+            border-left-color: var(--heap);
+        }
+
+        .console-box .hl {
+            color: var(--pointer);
+            font-weight: 700;
+        }
+
+        .console-box .hl-heap {
+            color: var(--heap);
+            font-weight: 700;
+        }
+
+        .console-box .hl-stack {
+            color: var(--stack);
+            font-weight: 700;
+        }
+
+        .console-box .hl-code {
+            color: var(--fn);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 13px;
+        }
+
+        .output-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .output-chip {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            background: rgba(79, 216, 168, 0.08);
+            border: 1px solid rgba(79, 216, 168, 0.3);
+            color: var(--heap);
+            padding: 4px 10px;
+            border-radius: 6px;
+            opacity: 0;
+            animation: chipIn .35s ease forwards;
+        }
+
+        @keyframes chipIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 980px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .step .step-label {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="masthead">
+        <h1><span class="dot"></span>Go Closures — Escape Analysis Visualizer</h1>
+        <div class="sub">stack · heap · code segment</div>
+    </div>
+
+    <div class="container">
+        <!-- LEFT: CODE -->
+        <div class="panel code-panel">
+            <div class="panel-head">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                <div class="filename">counter.go</div>
+            </div>
+            <div class="code-container" id="codeView"></div>
+        </div>
+
+        <!-- RIGHT: RAM -->
+        <div class="panel ram-panel">
+            <div class="ram-head">
+                <div class="label">Runtime Memory Layout</div>
+                <div class="phase" id="phaseTag">idle</div>
+            </div>
+            <div class="ram-wrap">
+                <div class="ram-layout" id="ramLayout">
+                    <div class="segment stack" id="stackSeg">
+                        <div class="segment-title">stack</div>
+                        <div class="stack-frames" id="stackFrames"></div>
+                    </div>
+                    <div class="segment heap" id="heapSeg">
+                        <div class="segment-title">heap</div>
+                        <div class="heap-blocks" id="heapBlocks"></div>
+                    </div>
+                    <div class="segment codeseg" id="codeSegEl">
+                        <div class="segment-title">code segment</div>
+                        <div class="code-blocks" id="codeBlocks"></div>
+                    </div>
+                </div>
+                <svg class="arrow-overlay" id="arrowOverlay"></svg>
+            </div>
+        </div>
+
+        <!-- BOTTOM: CONTROLS -->
+        <div class="panel bottom-panel">
+            <div class="stepper" id="stepper">
+                <div class="progress" id="stepperProgress"></div>
+            </div>
+
+            <div class="controls">
+                <button id="btnNext" onclick="nextStep()">Next step ▶</button>
+                <button id="btnCallNext" onclick="callNext()" disabled>
+                    call next() <span class="count-badge" id="callBadge">0/3</span>
+                </button>
+                <button id="btnReset" onclick="resetSim()">↺ Reset</button>
+            </div>
+
+            <div class="console-box" id="consoleMsg">Press <b>Next step</b> to begin the simulation.</div>
+            <div class="output-row" id="outputRow"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================
+           SOURCE CODE
+        ========================================================= */
+        const codeLines = [
+            { html: '<span class="kw">func</span> makeCounter() <span class="kw">func</span>() <span class="type">int</span> {' },
+            { html: '    count := <span class="type">0</span> <span class="com">// local var</span>' },
+            { html: '    inner := <span class="kw">func</span>() <span class="type">int</span> {' },
+            { html: '        count++' },
+            { html: '        <span class="kw">return</span> count' },
+            { html: '    }' },
+            { html: '    <span class="kw">return</span> inner' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    next := makeCounter()' },
+            { html: '    fmt.Println(next())' },
+            { html: '    fmt.Println(next())' },
+            { html: '    fmt.Println(next())' },
+            { html: '}' },
+        ];
+
+        /* =========================================================
+           STATIC CODE-SEGMENT BLOCKS
+        ========================================================= */
+        const codeSegBlocks = `
+  <div class="mem-block code-frame">
+    <div class="blk-title">inner() <span class="blk-addr">0x4a2f10</span></div>
+    <div class="row">count++</div>
+    <div class="row">return count</div>
+  </div>
+  <div class="mem-block code-frame">
+    <div class="blk-title">makeCounter() <span class="blk-addr">0x4a2e00</span></div>
+    <div class="row">alloc count</div>
+    <div class="row">build closure</div>
+    <div class="row">return</div>
+  </div>
+  <div class="mem-block code-frame">
+    <div class="blk-title">main() <span class="blk-addr">0x4a2d00</span></div>
+    <div class="row">call makeCounter</div>
+    <div class="row">call fmt.Println</div>
+  </div>
+`;
+
+        /* =========================================================
+           STEP TIMELINE
+           each step: which line(s) active, stepper label, console text,
+           stack/heap html, which arrows to draw, phase tag
+        ========================================================= */
+        const STEP_LABELS = ['main()', 'call', 'escape', 'closure', 'return', 'next()'];
+
+        const steps = [
+            // 0: main() frame created
+            {
+                activeLines: [10], dimLines: [],
+                node: 0, phase: 'main() entered',
+                console: `<span class="hl-code">main()</span> এর জন্য একটা নতুন stack frame তৈরি হলো। <span class="hl">next</span> ভ্যারিয়েবল declare হলো — value এখন <span class="hl-stack">nil</span>, কোনো closure এখনো assign হয়নি। Code Segment-এ সব function-এর instructions আগে থেকেই বসে আছে — ওটা কখনো বদলায় না।`,
+                stack: [
+                    { id: 'main', title: 'main()', cls: 'stack-frame', rows: [{ k: 'next', v: 'nil', isNil: true }] }
+                ],
+                heap: [],
+                arrows: []
+            },
+            // 1: makeCounter() called, count := 0 on stack
+            {
+                activeLines: [1], dimLines: [10],
+                node: 1, phase: 'makeCounter() called',
+                console: `<span class="hl-code">makeCounter()</span> কল হলো। Stack-এ একটা নতুন frame push হলো এবং সেখানে <span class="hl">count := 0</span> ডিক্লেয়ার হলো — এখনো পুরোপুরি সাধারণ একটা local variable, stack-এর-ই অংশ।`,
+                stack: [
+                    { id: 'mc', title: 'makeCounter()', cls: 'stack-frame', rows: [{ k: 'count', v: '0' }] },
+                    { id: 'main', title: 'main()', cls: 'stack-frame', rows: [{ k: 'next', v: 'nil', isNil: true }] }
+                ],
+                heap: [],
+                arrows: []
+            },
+            // 2: escape analysis -> count moves to heap
+            {
+                activeLines: [2], dimLines: [10],
+                node: 2, phase: 'escape analysis',
+                console: `<span class="hl-heap">Escape analysis</span> চলে! কম্পাইলার দেখে নিল যে <span class="hl">inner()</span> ফাংশন পরে এই <span class="hl">count</span>-কে ব্যবহার করবে এবং সেটা <span class="hl-code">makeCounter()</span> এর scope-এর বাইরেও বেঁচে থাকবে। তাই count escape করে <span class="hl-heap">STACK থেকে HEAP</span>-এ চলে গেলো।`,
+                stack: [
+                    { id: 'mc', title: 'makeCounter()', cls: 'stack-frame', rows: [{ k: 'count', v: '→ heap', isPtr: true }], badge: 'escapes' },
+                    { id: 'main', title: 'main()', cls: 'stack-frame', rows: [{ k: 'next', v: 'nil', isNil: true }] }
+                ],
+                heap: [
+                    { id: 'countBox', title: 'count', addr: '0xc000012050', cls: 'heap-frame', rows: [{ k: 'value', v: '0' }] }
+                ],
+                arrows: ['mc.count→countBox']
+            },
+            // 3: closure struct built on heap
+            {
+                activeLines: [6], dimLines: [10],
+                node: 3, phase: 'closure built',
+                console: `<span class="hl">inner</span> ফাংশনের জন্য Heap-এ একটা <span class="hl">Closure Struct</span> তৈরি হলো। এই struct দুটো জিনিস ধরে রাখে: ➀ Code Segment-এ <span class="hl-code">inner()</span>-এর address, ➁ Heap-এ থাকা <span class="hl">count</span>-এর pointer। এই দুটো মিলেই closure।`,
+                stack: [
+                    { id: 'mc', title: 'makeCounter()', cls: 'stack-frame', rows: [{ k: 'count', v: '→ heap', isPtr: true }] },
+                    { id: 'main', title: 'main()', cls: 'stack-frame', rows: [{ k: 'next', v: 'nil', isNil: true }] }
+                ],
+                heap: [
+                    { id: 'countBox', title: 'count', addr: '0xc000012050', cls: 'heap-frame', rows: [{ k: 'value', v: '0' }] },
+                    { id: 'closureBox', title: 'closure struct', addr: '0xc000018a00', cls: 'closure-frame', rows: [{ k: 'code', v: '0x4a2f10', isPtr: true }, { k: 'count', v: '0xc000012050', isPtr: true }] }
+                ],
+                arrows: ['mc.count→countBox', 'closureBox.code→inner', 'closureBox.count→countBox']
+            },
+            // 4: makeCounter returns, stack frame destroyed, next = closure addr
+            {
+                activeLines: [6], dimLines: [10],
+                node: 4, phase: 'makeCounter() returns',
+                console: `<span class="hl-code">makeCounter()</span> return করলো — তার stack frame এখন <span class="hl-stack">destroy</span> হয়ে গেছে (popped)। কিন্তু Heap-এ closure struct আর count পুরোপুরি বেঁচে আছে। <span class="hl">next</span> এখন সেই closure struct-এর address ধরে রাখলো — nil থেকে real pointer হয়ে গেলো।`,
+                stack: [
+                    { id: 'mc', title: 'makeCounter()', cls: 'stack-frame', destroyed: true, rows: [{ k: 'count', v: '→ heap' }] },
+                    { id: 'main', title: 'main()', cls: 'stack-frame', rows: [{ k: 'next', v: '0xc000018a00', isPtr: true }] }
+                ],
+                heap: [
+                    { id: 'countBox', title: 'count', addr: '0xc000012050', cls: 'heap-frame', rows: [{ k: 'value', v: '0' }] },
+                    { id: 'closureBox', title: 'closure struct', addr: '0xc000018a00', cls: 'closure-frame', rows: [{ k: 'code', v: '0x4a2f10', isPtr: true }, { k: 'count', v: '0xc000012050', isPtr: true }] }
+                ],
+                arrows: ['closureBox.code→inner', 'closureBox.count→countBox', 'main.next→closureBox']
+            }
+        ];
+
+        let currentStep = -1;
+        let callCount = 0;
+        let outputs = [];
+
+        /* =========================================================
+           RENDER CODE
+        ========================================================= */
+        const codeView = document.getElementById('codeView');
+        function renderCode() {
+            codeView.innerHTML = codeLines.map((l, i) =>
+                `<div class="line" id="line-${i}"><span class="ln">${i + 1}</span>${l.html}</div>`
+            ).join('');
+        }
+        renderCode();
+
+        /* =========================================================
+           RENDER CODE SEGMENT (static)
+        ========================================================= */
+        document.getElementById('codeBlocks').innerHTML = codeSegBlocks;
+
+        /* =========================================================
+           STEPPER
+        ========================================================= */
+        const stepperEl = document.getElementById('stepper');
+        function renderStepper() {
+            const progress = document.createElement('div');
+            progress.className = 'progress';
+            progress.id = 'stepperProgress';
+            stepperEl.innerHTML = '';
+            STEP_LABELS.forEach((label, i) => {
+                const s = document.createElement('div');
+                s.className = 'step';
+                s.id = `step-${i}`;
+                s.innerHTML = `<div class="step-node">${i + 1}</div><div class="step-label">${label}</div>`;
+                stepperEl.appendChild(s);
+            });
+            stepperEl.appendChild(progress);
+        }
+        renderStepper();
+
+        function updateStepper(nodeIdx) {
+            document.querySelectorAll('.step').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                if (i < nodeIdx) el.classList.add('done');
+                if (i === nodeIdx) el.classList.add('active');
+            });
+            const pct = (nodeIdx / (STEP_LABELS.length - 1)) * 100;
+            document.getElementById('stepperProgress').style.width = pct + '%';
+        }
+
+        /* =========================================================
+           BLOCK RENDERING HELPERS
+        ========================================================= */
+        function rowHTML(row, prevVal) {
+            const valClass = row.isNil ? 'nil' : (row.isPtr ? 'ptr' : '');
+            const pulse = (prevVal !== undefined && prevVal !== row.v) ? ' pulse' : '';
+            return `<div class="row"><span class="k">${row.k} =</span> <span class="v ${valClass}${pulse}">${row.v}</span></div>`;
+        }
+
+        function frameHTML(frame, prevRowsMap) {
+            const destroyedCls = frame.destroyed ? ' destroyed' : '';
+            const prevRows = prevRowsMap ? prevRowsMap[frame.id] : null;
+            const rowsHtml = frame.rows.map((r, idx) => {
+                const prevVal = prevRows && prevRows[idx] ? prevRows[idx].v : undefined;
+                return rowHTML(r, prevVal);
+            }).join('');
+            const badge = frame.badge ? `<span class="escape-tag">↑ ${frame.badge}</span>` : '';
+            return `<div class="mem-block ${frame.cls}${destroyedCls}" id="blk-${frame.id}">
+    <div class="blk-title">${frame.title} ${badge}</div>
+    ${rowsHtml}
+  </div>`;
+        }
+
+        function heapHTML(block, prevRowsMap) {
+            const prevRows = prevRowsMap ? prevRowsMap[block.id] : null;
+            const rowsHtml = block.rows.map((r, idx) => {
+                const prevVal = prevRows && prevRows[idx] ? prevRows[idx].v : undefined;
+                return rowHTML(r, prevVal);
+            }).join('');
+            return `<div class="mem-block ${block.cls}" id="blk-${block.id}">
+    <div class="blk-title">${block.title} <span class="blk-addr">${block.addr}</span></div>
+    ${rowsHtml}
+  </div>`;
+        }
+
+        // remember previous render's row values for pulse-on-change detection
+        let prevStackRows = {};
+        let prevHeapRows = {};
+
+        function snapshotRows(items) {
+            const map = {};
+            items.forEach(it => map[it.id] = it.rows);
+            return map;
+        }
+
+        /* =========================================================
+           ARROW OVERLAY (SVG)
+           Connects DOM elements across panes with a curved dashed path
+        ========================================================= */
+        const overlay = document.getElementById('arrowOverlay');
+        const ramWrap = document.querySelector('.ram-wrap');
+
+        function getAnchor(elId, side) {
+            const el = document.getElementById(elId);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const w = ramWrap.getBoundingClientRect();
+            const x = side === 'right' ? (r.right - w.left) : (r.left - w.left);
+            const y = (r.top + r.height / 2) - w.top;
+            return { x, y };
+        }
+
+        // arrow spec: "sourceBlockId.field→targetBlockId" — we resolve source by its parent block id
+        const ARROW_TARGETS = {
+            inner: null, // resolved dynamically to inner() code block
+        };
+
+        function resolveArrowEndpoints(spec) {
+            const [from, to] = spec.split('→');
+            const fromBlockId = from.split('.')[0];
+            let toBlockId = to;
+            // "inner" maps to the first code-frame block (inner() in code segment)
+            if (to === 'inner') {
+                const codeBlocks = document.querySelectorAll('#codeBlocks .mem-block');
+                if (codeBlocks[0]) return {
+                    from: getAnchor(`blk-${fromBlockId}`, 'right'),
+                    to: (() => {
+                        const r = codeBlocks[0].getBoundingClientRect(); const w = ramWrap.getBoundingClientRect();
+                        return { x: r.left - w.left, y: (r.top + r.height / 2) - w.top };
+                    })()
+                };
+            }
+            return {
+                from: getAnchor(`blk-${fromBlockId}`, 'right'),
+                to: getAnchor(`blk-${toBlockId}`, 'left')
+            };
+        }
+
+        function drawArrows(specs) {
+            overlay.innerHTML = '';
+            if (!specs || !specs.length) return;
+            // wait a tick for layout to settle
+            requestAnimationFrame(() => {
+                const w = ramWrap.getBoundingClientRect();
+                overlay.setAttribute('width', w.width);
+                overlay.setAttribute('height', w.height);
+                overlay.setAttribute('viewBox', `0 0 ${w.width} ${w.height}`);
+
+                specs.forEach((spec, i) => {
+                    const pts = resolveArrowEndpoints(spec);
+                    if (!pts || !pts.from || !pts.to) return;
+                    const { from, to } = pts;
+                    const midX = (from.x + to.x) / 2;
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const d = `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`;
+                    path.setAttribute('d', d);
+                    path.setAttribute('pathLength', '200');
+                    overlay.appendChild(path);
+
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', to.x);
+                    dot.setAttribute('cy', to.y);
+                    dot.setAttribute('r', 3.5);
+                    overlay.appendChild(dot);
+
+                    setTimeout(() => {
+                        path.classList.add('show');
+                        dot.classList.add('show');
+                    }, i * 120);
+                });
+            });
+        }
+
+        /* =========================================================
+           MAIN STEP RENDERING
+        ========================================================= */
+        function renderStep(data) {
+            // code highlighting
+            document.querySelectorAll('.line').forEach(el => el.classList.remove('active', 'faded'));
+            (data.dimLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('faded'); });
+            (data.activeLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('active'); });
+
+            // phase tag
+            document.getElementById('phaseTag').textContent = data.phase;
+
+            // stack
+            document.getElementById('stackFrames').innerHTML = data.stack.map(f => frameHTML(f, prevStackRows)).join('');
+            prevStackRows = snapshotRows(data.stack);
+
+            // heap
+            document.getElementById('heapBlocks').innerHTML = data.heap.map(b => heapHTML(b, prevHeapRows)).join('');
+            prevHeapRows = snapshotRows(data.heap);
+
+            // console
+            const consoleEl = document.getElementById('consoleMsg');
+            consoleEl.innerHTML = data.console;
+            consoleEl.classList.remove('done-flash');
+
+            // stepper
+            updateStepper(data.node);
+
+            // arrows
+            drawArrows(data.arrows);
+        }
+
+        /* =========================================================
+           CONTROLS
+        ========================================================= */
+        function nextStep() {
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                renderStep(steps[currentStep]);
+
+                if (currentStep === steps.length - 1) {
+                    document.getElementById('btnNext').disabled = true;
+                    document.getElementById('btnCallNext').disabled = false;
+                }
+            }
+        }
+
+        function callNext() {
+            if (callCount >= 3) return;
+            callCount++;
+
+            // highlight the relevant Println line
+            document.querySelectorAll('.line').forEach(el => el.classList.remove('active'));
+            const lineIdx = 10 + callCount; // lines 11,12,13 -> fmt.Println calls
+            const lineEl = document.getElementById(`line-${lineIdx}`);
+            if (lineEl) lineEl.classList.add('active');
+
+            document.getElementById('phaseTag').textContent = `next() call #${callCount}`;
+            updateStepper(5);
+
+            // update heap count value with pulse
+            const newHeap = [
+                { id: 'countBox', title: 'count', addr: '0xc000012050', cls: 'heap-frame', rows: [{ k: 'value', v: String(callCount) }] },
+                { id: 'closureBox', title: 'closure struct', addr: '0xc000018a00', cls: 'closure-frame', rows: [{ k: 'code', v: '0x4a2f10', isPtr: true }, { k: 'count', v: '0xc000012050', isPtr: true }] }
+            ];
+            document.getElementById('heapBlocks').innerHTML = newHeap.map(b => heapHTML(b, prevHeapRows)).join('');
+            prevHeapRows = snapshotRows(newHeap);
+
+            // redraw arrows since heap block markup was replaced
+            drawArrows(['closureBox.code→inner', 'closureBox.count→countBox', 'main.next→closureBox']);
+
+            // console message
+            const consoleEl = document.getElementById('consoleMsg');
+            consoleEl.innerHTML = `তিন নম্বর call-এর মধ্যে এটা call <span class="hl">#${callCount}</span>। প্রতিবার <span class="hl-stack">একই</span> Heap address-এ গিয়ে <span class="hl">count</span> বাড়লো — কোনো stack frame ছাড়াই! এটাই closure-এর শক্তি: একটা ফাংশন তার ঘিরে থাকা variable-কে মনে রাখে।`;
+
+            // output chip
+            const outputRow = document.getElementById('outputRow');
+            const chip = document.createElement('div');
+            chip.className = 'output-chip';
+            chip.textContent = `fmt.Println(next()) → ${callCount}`;
+            outputRow.appendChild(chip);
+
+            document.getElementById('callBadge').textContent = `${callCount}/3`;
+
+            if (callCount === 3) {
+                document.getElementById('btnCallNext').disabled = true;
+                consoleEl.classList.add('done-flash');
+                consoleEl.innerHTML += ` <br><b style="color:var(--heap)">✓ সিমুলেশন সম্পূর্ণ</b> — পুরো escape-analysis → closure → heap-persistence ফ্লো শেষ হলো।`;
+            }
+        }
+
+        function resetSim() {
+            currentStep = -1;
+            callCount = 0;
+            outputs = [];
+            prevStackRows = {};
+            prevHeapRows = {};
+
+            renderCode();
+            document.getElementById('stackFrames').innerHTML = '';
+            document.getElementById('heapBlocks').innerHTML = '';
+            document.getElementById('outputRow').innerHTML = '';
+            overlay.innerHTML = '';
+
+            document.getElementById('phaseTag').textContent = 'idle';
+            updateStepper(-1);
+
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('btnCallNext').disabled = true;
+            document.getElementById('callBadge').textContent = '0/3';
+
+            const consoleEl = document.getElementById('consoleMsg');
+            consoleEl.classList.remove('done-flash');
+            consoleEl.innerHTML = 'Press <b>Next step</b> to begin the simulation.';
+        }
+
+        // redraw arrows on resize so they stay aligned with blocks
+        window.addEventListener('resize', () => {
+            if (currentStep >= 0 && currentStep < steps.length) {
+                drawArrows(steps[currentStep].arrows);
+            }
+        });
+
+        // initial state
+        updateStepper(-1);
+    </script>
+</body>
+
+</html>
