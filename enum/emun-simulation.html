@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Enum Pattern Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e14;
+            --panel: #11161f;
+            --panel-2: #0d121a;
+            --line: #232b38;
+            --line-soft: #1a212c;
+            --text: #c7d0dc;
+            --text-dim: #6b7686;
+            --text-bright: #eef2f7;
+
+            --stack: #ff8a7a;
+            --stack-dim: #5a3934;
+            --heap: #4fd8a8;
+            --heap-dim: #2f4a3f;
+            --code: #8aa6ff;
+            --code-dim: #36406b;
+            --pointer: #ffcc66;
+            --value: #c792ea;
+
+            --kw: #ff8a7a;
+            --type: #ffb454;
+            --str: #4fd8a8;
+            --com: #5b6677;
+            --fn: #8aa6ff;
+            --num: #ffb454;
+
+            --sans: 'Space Grotesk', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 28px 40px;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(138, 166, 255, 0.08), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(79, 216, 168, 0.06), transparent 40%),
+                var(--bg);
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            max-width: 1480px;
+            margin: 0 auto 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line-soft);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .masthead h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-bright);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .masthead h1 .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--type);
+            box-shadow: 0 0 12px var(--type);
+        }
+
+        .masthead .sub {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 0.92fr 1.5fr;
+            gap: 18px;
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        .code-panel .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .traffic {
+            display: flex;
+            gap: 6px;
+        }
+
+        .traffic span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .traffic span:nth-child(1) {
+            background: #ff5f57;
+        }
+
+        .traffic span:nth-child(2) {
+            background: #febc2e;
+        }
+
+        .traffic span:nth-child(3) {
+            background: #28c840;
+        }
+
+        .filename {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .code-container {
+            font-family: var(--mono);
+            line-height: 1.66;
+            font-size: 12.6px;
+            padding: 14px 0 18px;
+            white-space: pre;
+            overflow-x: auto;
+            min-height: 560px;
+            max-height: 640px;
+            overflow-y: auto;
+        }
+
+        .line {
+            position: relative;
+            padding: 1px 16px 1px 48px;
+            transition: background-color .25s ease, border-color .25s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .line .ln {
+            position: absolute;
+            left: 14px;
+            width: 24px;
+            text-align: right;
+            color: #3a4250;
+            font-size: 11px;
+            user-select: none;
+        }
+
+        .line.active {
+            background: linear-gradient(90deg, rgba(255, 180, 84, 0.16), rgba(255, 180, 84, 0.03) 70%);
+            border-left-color: var(--type);
+        }
+
+        .line.faded {
+            opacity: 0.4;
+        }
+
+        .kw {
+            color: var(--kw);
+            font-weight: 600;
+        }
+
+        .type {
+            color: var(--type);
+        }
+
+        .com {
+            color: var(--com);
+            font-style: italic;
+        }
+
+        .fn {
+            color: var(--fn);
+        }
+
+        .str {
+            color: var(--str);
+        }
+
+        .num {
+            color: var(--num);
+        }
+
+        .vis-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .vis-head .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .vis-head .phase {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--type);
+            background: rgba(255, 180, 84, 0.08);
+            border: 1px solid rgba(255, 180, 84, 0.25);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .vis-wrap {
+            position: relative;
+            padding: 20px;
+            min-height: 560px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .vis-zone {
+            border-radius: 8px;
+            padding: 14px;
+            background: var(--panel-2);
+            border: 1.5px solid var(--line);
+        }
+
+        .vis-zone-title {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            text-transform: uppercase;
+        }
+
+        .vis-zone-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.2;
+        }
+
+        /* ---------- iota table ---------- */
+        .iota-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .iota-cell {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 9px 12px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            text-align: center;
+            min-width: 84px;
+            transition: all .3s cubic-bezier(.25, 1, .5, 1);
+            position: relative;
+        }
+
+        .iota-cell .ic-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 5px;
+        }
+
+        .iota-cell .ic-num {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-dim);
+        }
+
+        .iota-cell.active {
+            border-color: var(--type);
+            background: rgba(255, 180, 84, 0.12);
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 0 8px 18px -8px rgba(255, 180, 84, 0.55);
+        }
+
+        .iota-cell.active .ic-num {
+            color: var(--type);
+        }
+
+        .iota-cell.done .ic-num {
+            color: var(--code);
+            opacity: 0.85;
+        }
+
+        .iota-cell.ghost {
+            opacity: 0.3;
+            border-style: dashed;
+        }
+
+        /* ---------- typed value cards ---------- */
+        .type-card {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 11px 14px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            min-width: 160px;
+            transition: all .3s ease;
+        }
+
+        .type-card .tc-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .type-card .tc-type {
+            font-size: 9.5px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+
+        .type-card .tc-val {
+            font-size: 14px;
+            color: var(--str);
+        }
+
+        .type-card.active {
+            border-color: var(--str);
+            background: rgba(79, 216, 168, 0.08);
+        }
+
+        .type-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* ---------- mismatch demo ---------- */
+        .mismatch-demo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            font-family: var(--mono);
+            font-size: 13px;
+        }
+
+        .mismatch-box {
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+        }
+
+        .mismatch-arrow {
+            font-size: 18px;
+            color: var(--text-dim);
+        }
+
+        .mismatch-verdict {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+
+        .mismatch-verdict.fail {
+            background: rgba(255, 138, 122, 0.12);
+            border: 1px solid rgba(255, 138, 122, 0.4);
+            color: var(--stack);
+        }
+
+        .mismatch-verdict.pass {
+            background: rgba(79, 216, 168, 0.1);
+            border: 1px solid rgba(79, 216, 168, 0.35);
+            color: var(--heap);
+        }
+
+        /* ---------- switch dispatch ---------- */
+        .switch-case {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            border-radius: 7px;
+            padding: 9px 13px;
+            background: #161d27;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--line);
+            margin-bottom: 7px;
+            transition: all .25s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .switch-case.match {
+            border-left-color: var(--type);
+            background: rgba(255, 180, 84, 0.1);
+            box-shadow: 0 0 0 1px rgba(255, 180, 84, 0.25) inset;
+        }
+
+        .switch-case .sc-result {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .switch-case.match .sc-result {
+            color: var(--type);
+            font-weight: 700;
+        }
+
+        /* ---------- function call box ---------- */
+        .call-box {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 12px 16px;
+            background: #161d27;
+            border: 1.5px solid var(--code-dim);
+            border-left: 3px solid var(--code);
+        }
+
+        .call-box .cb-sig {
+            color: var(--code);
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .call-box .cb-arg {
+            color: var(--text-dim);
+            font-size: 11.5px;
+        }
+
+        .info-strip {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-dim);
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            margin-top: 8px;
+        }
+
+        /* ---------- bottom panel ---------- */
+        .bottom-panel {
+            grid-column: 1 / -1;
+            padding: 20px 22px;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            position: relative;
+            margin-bottom: 22px;
+            padding: 0 6px;
+            overflow-x: auto;
+        }
+
+        .step-track {
+            position: relative;
+            flex: 1;
+            min-width: 760px;
+        }
+
+        .step-track::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background: var(--line);
+            z-index: 1;
+        }
+
+        .step-track .progress {
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            height: 2px;
+            background: var(--type);
+            z-index: 2;
+            transition: width .35s cubic-bezier(.25, 1, .5, 1);
+            width: 0%;
+        }
+
+        .step-track-inner {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 3;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-width: 56px;
+        }
+
+        .step-node {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            border: 2px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .step.active .step-node {
+            border-color: var(--type);
+            background: var(--type);
+            color: #1a1408;
+            box-shadow: 0 0 12px rgba(255, 180, 84, 0.55);
+        }
+
+        .step.done .step-node {
+            border-color: var(--code-dim);
+            color: var(--type);
+            background: transparent;
+        }
+
+        .step .step-label {
+            font-size: 8.5px;
+            color: var(--text-dim);
+            text-align: center;
+            max-width: 64px;
+        }
+
+        .step.active .step-label {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 13.5px;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #3a4555;
+            background: #161d27;
+            transform: translateY(-1px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #btnNext {
+            background: linear-gradient(135deg, #ffb454, #ffcc66);
+            color: #1a1408;
+            border-color: transparent;
+        }
+
+        #btnNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        .console-box {
+            background: #05070a;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--type);
+            padding: 14px 16px;
+            border-radius: 7px;
+            font-size: 13.5px;
+            line-height: 1.65;
+            min-height: 54px;
+            transition: border-left-color .3s ease;
+        }
+
+        .console-box .hl {
+            color: var(--type);
+            font-weight: 700;
+        }
+
+        .console-box .hl-heap {
+            color: var(--heap);
+            font-weight: 700;
+        }
+
+        .console-box .hl-stack {
+            color: var(--stack);
+            font-weight: 700;
+        }
+
+        .console-box .hl-code {
+            color: var(--fn);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .console-box .hl-str {
+            color: var(--str);
+            font-weight: 700;
+        }
+
+        .output-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .output-chip {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: rgba(79, 216, 168, 0.08);
+            border: 1px solid rgba(79, 216, 168, 0.3);
+            color: var(--heap);
+            padding: 5px 10px;
+            border-radius: 6px;
+            opacity: 0;
+            animation: chipIn .35s ease forwards;
+            align-self: flex-start;
+        }
+
+        @keyframes chipIn {
+            from {
+                opacity: 0;
+                transform: scale(0.85);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .takeaway-card {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12.5px;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--type);
+            background: var(--panel-2);
+            opacity: 0;
+            animation: chipIn .4s ease forwards;
+        }
+
+        .takeaway-card .tt {
+            font-weight: 700;
+            font-size: 11.5px;
+            color: var(--type);
+            margin-bottom: 4px;
+        }
+
+        .takeaway-card .td {
+            color: var(--text-dim);
+        }
+
+        .js-compare {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12px;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--value);
+            background: var(--panel-2);
+            font-family: var(--mono);
+            opacity: 0;
+            animation: chipIn .4s ease forwards;
+            color: var(--text-dim);
+        }
+
+        .js-compare .jc-title {
+            color: var(--value);
+            font-weight: 700;
+            margin-bottom: 5px;
+            font-family: var(--sans);
+            font-size: 11.5px;
+        }
+
+        @media (max-width: 980px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .step .step-label {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="masthead">
+        <h1><span class="dot"></span>Go Enum Pattern — type + const + iota</h1>
+        <div class="sub">JS enum এর বিকল্প · type safety · iota</div>
+    </div>
+
+    <div class="container">
+        <div class="panel code-panel">
+            <div class="panel-head">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                <div class="filename">enum_demo.go</div>
+            </div>
+            <div class="code-container" id="codeView"></div>
+        </div>
+
+        <div class="panel vis-panel">
+            <div class="vis-head">
+                <div class="label" id="visLabel">Type System</div>
+                <div class="phase" id="phaseTag">idle</div>
+            </div>
+            <div class="vis-wrap" id="visWrap"></div>
+        </div>
+
+        <div class="panel bottom-panel">
+            <div class="stepper">
+                <div class="step-track" id="stepTrack">
+                    <div class="progress" id="stepperProgress"></div>
+                    <div class="step-track-inner" id="stepTrackInner"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="btnNext" onclick="nextStep()">Next step ▶</button>
+                <button id="btnReset" onclick="resetSim()">↺ Reset</button>
+            </div>
+
+            <div class="console-box" id="consoleMsg">Press <b>Next step</b> to begin.</div>
+            <div id="extraRow"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           SOURCE CODE
+        ========================================================================= */
+        const codeLines = [
+            { html: '<span class="kw">type</span> Weekday <span class="type">int</span>' },
+            { html: '' },
+            { html: '<span class="kw">const</span> (' },
+            { html: '    Sunday    Weekday = iota <span class="com">// 0</span>' },
+            { html: '    Monday                   <span class="com">// 1</span>' },
+            { html: '    Tuesday                  <span class="com">// 2</span>' },
+            { html: '    Wednesday                <span class="com">// 3</span>' },
+            { html: '    Thursday                 <span class="com">// 4</span>' },
+            { html: '    Friday                   <span class="com">// 5</span>' },
+            { html: '    Saturday                 <span class="com">// 6</span>' },
+            { html: ')' },
+            { html: '' },
+            { html: '<span class="com">// 1. OfficeStatus is a custom type.</span>' },
+            { html: '<span class="kw">type</span> OfficeStatus <span class="type">string</span>' },
+            { html: '' },
+            { html: '<span class="kw">const</span> (' },
+            { html: '    WorkingDay OfficeStatus = <span class="str">"open"</span>' },
+            { html: '    HalfDay    OfficeStatus = <span class="str">"half_day"</span>' },
+            { html: '    OffDay     OfficeStatus = <span class="str">"closed"</span>' },
+            { html: ')' },
+            { html: '' },
+            { html: '<span class="com">// 2. Return type: OfficeStatus (not plain string)</span>' },
+            { html: '<span class="kw">func</span> getWorkDayStatus(day Weekday) OfficeStatus {' },
+            { html: '    <span class="kw">switch</span> day {' },
+            { html: '    <span class="kw">case</span> Sunday, Monday, Tuesday, Wednesday:' },
+            { html: '        <span class="kw">return</span> WorkingDay' },
+            { html: '    <span class="kw">case</span> Thursday:' },
+            { html: '        <span class="kw">return</span> HalfDay' },
+            { html: '    <span class="kw">case</span> Friday, Saturday:' },
+            { html: '        <span class="kw">return</span> OffDay' },
+            { html: '    <span class="kw">default</span>:' },
+            { html: '        <span class="kw">return</span> <span class="str">"invalid_status"</span>' },
+            { html: '    }' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    status := getWorkDayStatus(Thursday)' },
+            { html: '' },
+            { html: '    fmt.Println(<span class="str">"Office Status:"</span>, status)' },
+            { html: '' },
+            { html: '    <span class="kw">if</span> status == HalfDay {' },
+            { html: '        fmt.Println(<span class="str">"It\'s a half day."</span>)' },
+            { html: '    }' },
+            { html: '}' },
+        ];
+
+        const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const officeStatusConsts = [
+            { name: 'WorkingDay', val: '"open"' },
+            { name: 'HalfDay', val: '"half_day"' },
+            { name: 'OffDay', val: '"closed"' },
+        ];
+
+        /* =========================================================================
+           STEP TIMELINE
+        ========================================================================= */
+        const STEP_LABELS = [
+            'Weekday type', 'iota: Sun', 'iota: Mon', 'iota: Tue', 'iota: Wed', 'iota: Thu', 'iota: Fri', 'iota: Sat',
+            'OfficeStatus type', 'status consts', 'func signature', 'call getWorkDayStatus', 'switch dispatch',
+            'case match', 'return HalfDay', 'print status', 'direct compare'
+        ];
+
+        function renderIotaZone(activeIdx, doneUpto) {
+            return `
+    <div class="vis-zone">
+      <div class="vis-zone-title">type Weekday int — underlying type is int</div>
+      <div class="iota-row">
+        ${weekdayNames.map((name, i) => {
+                const cls = i === activeIdx ? 'active' : (i <= doneUpto && i !== activeIdx ? 'done' : (i > doneUpto && i !== activeIdx ? 'ghost' : ''));
+                return `<div class="iota-cell ${cls}"><div class="ic-name">${name}</div><div class="ic-num">${i}</div></div>`;
+            }).join('')}
+      </div>
+      <div class="info-strip">iota প্রতিটা const লাইনে স্বয়ংক্রিয়ভাবে ০ থেকে শুরু করে ১ করে বাড়ে — JS-এ যেমন enum { Sunday, Monday, ... } স্বয়ংক্রিয়ভাবে 0,1,2... অ্যাসাইন করে, ঠিক একইরকম idea</div>
+    </div>`;
+        }
+
+        function renderOfficeStatusZone(activeIdx) {
+            return `
+    <div class="vis-zone">
+      <div class="vis-zone-title">type OfficeStatus string — a brand-new named type</div>
+      <div class="type-row">
+        ${officeStatusConsts.map((c, i) => `
+          <div class="type-card ${i === activeIdx ? 'active' : ''}">
+            <div class="tc-name">${c.name}</div>
+            <div class="tc-type">OfficeStatus</div>
+            <div class="tc-val">${c.val}</div>
+          </div>`).join('')}
+      </div>
+      <div class="info-strip">এগুলো plain string না — এদের নিজস্ব টাইপ <span style="color:var(--str)">OfficeStatus</span>, যা string-এর উপর ভিত্তি করে বানানো একটা distinct type</div>
+    </div>`;
+        }
+
+        function renderTypeSafetyZone() {
+            return `
+    <div class="vis-zone">
+      <div class="vis-zone-title">why a distinct type matters — compile-time safety</div>
+      <div class="mismatch-demo">
+        <div class="mismatch-box">var s <span style="color:var(--type)">string</span> = WorkingDay</div>
+        <span class="mismatch-arrow">→</span>
+        <div class="mismatch-verdict fail">✗ compile error</div>
+      </div>
+      <div class="mismatch-demo" style="margin-top:10px;">
+        <div class="mismatch-box">var s <span style="color:var(--str)">OfficeStatus</span> = WorkingDay</div>
+        <span class="mismatch-arrow">→</span>
+        <div class="mismatch-verdict pass">✓ ok</div>
+      </div>
+      <div class="info-strip">JS/TS-এ string enum ব্যবহার করলে যেমন accidental ভুল string assign করা ঠেকানো যায়, Go-তেও <span style="color:var(--str)">type OfficeStatus string</span> একই সুরক্ষা দেয় — plain string আর typed value মিশতে পারে না</div>
+    </div>`;
+        }
+
+        function renderFuncSigZone() {
+            return `
+    <div class="vis-zone">
+      <div class="vis-zone-title">function signature</div>
+      <div class="call-box">
+        <div class="cb-sig">func getWorkDayStatus(day <span style="color:var(--type)">Weekday</span>) <span style="color:var(--str)">OfficeStatus</span></div>
+        <div class="cb-arg">parameter type: Weekday (int-based) → return type: OfficeStatus (string-based)</div>
+      </div>
+      <div class="info-strip">return type plain <span style="color:var(--type)">string</span> না লিখে <span style="color:var(--str)">OfficeStatus</span> লেখায় caller-কে force করা হচ্ছে শুধু valid enum value-ই পেতে/পাঠাতে</div>
+    </div>`;
+        }
+
+        function renderCallZone(arg, switchActiveCase, returnedVal, printed, compared) {
+            const cases = [
+                { label: 'Sunday, Monday, Tuesday, Wednesday', result: 'WorkingDay', match: switchActiveCase === 'wd' },
+                { label: 'Thursday', result: 'HalfDay', match: switchActiveCase === 'hd' },
+                { label: 'Friday, Saturday', result: 'OffDay', match: switchActiveCase === 'od' },
+                { label: 'default', result: '"invalid_status"', match: switchActiveCase === 'def' },
+            ];
+            return `
+    <div class="vis-zone">
+      <div class="vis-zone-title">function call</div>
+      <div class="call-box">
+        <div class="cb-sig">getWorkDayStatus(<span style="color:var(--type)">${arg}</span>)</div>
+        <div class="cb-arg">day = Thursday → underlying int value = 4</div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">switch day { ... } — case dispatch</div>
+      ${cases.map(c => `
+        <div class="switch-case ${c.match ? 'match' : ''}">
+          <span>case ${c.label}:</span>
+          <span class="sc-result">return ${c.result}</span>
+        </div>`).join('')}
+    </div>
+    ${returnedVal ? `
+    <div class="vis-zone">
+      <div class="vis-zone-title">return value</div>
+      <div class="type-row">
+        <div class="type-card active">
+          <div class="tc-name">status</div>
+          <div class="tc-type">OfficeStatus</div>
+          <div class="tc-val">"${returnedVal}"</div>
+        </div>
+      </div>
+    </div>` : ''}
+    ${compared !== undefined ? `
+    <div class="vis-zone">
+      <div class="vis-zone-title">if status == HalfDay — direct enum comparison</div>
+      <div class="mismatch-demo">
+        <div class="mismatch-box">status == HalfDay</div>
+        <span class="mismatch-arrow">→</span>
+        <div class="mismatch-verdict ${compared ? 'pass' : 'fail'}">${compared ? '✓ true' : '✗ false'}</div>
+      </div>
+      <div class="info-strip">দুটোই <span style="color:var(--str)">OfficeStatus</span> টাইপ হওয়ায় সরাসরি == দিয়ে তুলনা করা যায় — কোনো string literal ("half_day") মনে রাখার দরকার নেই</div>
+    </div>` : ''}
+  `;
+        }
+
+        const steps = [
+            {
+                node: 0, phase: 'Weekday named type', activeLines: [0],
+                console: `<span class="hl">type Weekday int</span> — এটা একটা <span class="hl">নতুন named type</span> তৈরি করলো যার underlying type <span class="hl">int</span>। JS-এ যেমন সরাসরি <span class="hl-code">enum Weekday { Sunday, Monday, ... }</span> লেখা যায়, Go-তে প্রথমে এমন একটা distinct type বানিয়ে নিতে হয়।`,
+                render: () => renderIotaZone(-1, -1)
+            },
+            ...weekdayNames.map((name, i) => ({
+                node: i + 1, phase: `iota → ${name} = ${i}`, activeLines: [3 + i],
+                console: i === 0
+                    ? `<span class="hl">Sunday Weekday = iota</span> — <span class="hl">iota</span> এই const block-এর প্রথম লাইনে <span class="hl">0</span> থেকে শুরু করে। তাই <span class="hl">Sunday = 0</span>।`
+                    : `<span class="hl">${name}</span> — explicitly কিছু লেখা হয়নি, কিন্তু <span class="hl">iota</span> প্রতি লাইনে এক করে বাড়ে, তাই <span class="hl">${name} = ${i}</span> স্বয়ংক্রিয়ভাবে বসে গেলো।`,
+                render: () => renderIotaZone(i, i - 1)
+            })),
+            {
+                node: 8, phase: 'OfficeStatus custom type', activeLines: [13],
+                console: `<span class="hl-str">type OfficeStatus string</span> — এবার আরেকটা named type, কিন্তু এবার underlying type <span class="hl">string</span>। এটা plain string না — Go এটাকে একটা সম্পূর্ণ আলাদা, distinct টাইপ হিসেবে treat করে।`,
+                render: () => renderOfficeStatusZone(-1)
+            },
+            {
+                node: 9, phase: 'status constants', activeLines: [16, 17, 18],
+                console: `তিনটা <span class="hl-str">OfficeStatus</span> typed constant তৈরি হলো: <span class="hl">WorkingDay = "open"</span>, <span class="hl">HalfDay = "half_day"</span>, <span class="hl">OffDay = "closed"</span>। এগুলো string value ধরে রাখলেও, এদের টাইপ <span class="hl-str">OfficeStatus</span> — তাই type-checker এদের সাধারণ string-এর সাথে গুলিয়ে ফেলবে না।`,
+                render: () => `${renderOfficeStatusZone(-1)}${renderTypeSafetyZone()}`
+            },
+            {
+                node: 10, phase: 'function signature', activeLines: [22],
+                console: `<span class="hl-code">func getWorkDayStatus(day Weekday) OfficeStatus</span> — parameter আর return value দুটোই typed: input <span class="hl">Weekday</span>, output <span class="hl-str">OfficeStatus</span>। শুধু <span class="hl">string</span> রিটার্ন টাইপ লিখলেও কাজ চলতো, কিন্তু তাহলে caller ভুল করে যেকোনো random string পাঠাতে/পেতে পারতো — typed return এই ভুল আটকায়।`,
+                render: () => renderFuncSigZone()
+            },
+            {
+                node: 11, phase: 'call getWorkDayStatus(Thursday)', activeLines: [37],
+                console: `<span class="hl-code">main()</span>-এ <span class="hl">getWorkDayStatus(Thursday)</span> কল হলো। মনে রাখো, <span class="hl">Thursday</span> আসলে underlying ভ্যালু <span class="hl">4</span> বহন করছে (iota থেকে পাওয়া)।`,
+                render: () => renderCallZone('Thursday')
+            },
+            {
+                node: 12, phase: 'switch day { }', activeLines: [24],
+                console: `function-এর ভেতরে <span class="hl">switch day { }</span> শুরু হলো — Go এখন একটা একটা করে case পরীক্षা করবে।`,
+                render: () => renderCallZone('Thursday', null)
+            },
+            {
+                node: 13, phase: 'case Thursday matched', activeLines: [27, 28],
+                console: `<span class="hl">case Thursday:</span> ম্যাচ করলো! Go-র switch-এ <span class="hl-stack">break</span> লেখার দরকার নেই, ম্যাচ পেলেই সেই case execute হয়ে switch থেকে বেরিয়ে যায়।`,
+                render: () => renderCallZone('Thursday', 'hd')
+            },
+            {
+                node: 14, phase: 'return HalfDay', activeLines: [28],
+                console: `<span class="hl">return HalfDay</span> — function এখন <span class="hl-str">OfficeStatus("half_day")</span> রিটার্ন করলো এবং <span class="hl">status</span> ভ্যারিয়েবলে এসে বসলো।`,
+                render: () => renderCallZone('Thursday', 'hd', 'half_day')
+            },
+            {
+                node: 15, phase: 'print status', activeLines: [39],
+                console: `<span class="hl">fmt.Println("Office Status:", status)</span> — <span class="hl-str">OfficeStatus</span> টাইপ হলেও এর underlying string ভ্যালুই প্রিন্ট হয়: <span class="hl">half_day</span>।`,
+                render: () => renderCallZone('Thursday', 'hd', 'half_day'),
+                output: 'Office Status: half_day'
+            },
+            {
+                node: 16, phase: 'direct enum comparison', activeLines: [41, 42],
+                console: `<span class="hl">if status == HalfDay</span> — দুটোই <span class="hl-str">OfficeStatus</span> টাইপ হওয়ায় সরাসরি <span class="hl">==</span> দিয়ে তুলনা করা গেলো, কোনো string literal হার্ডকোড না করেই। এটাই type-safe enum-এর মূল সুবিধা — ঠিক যেমন TypeScript-এ string enum তুলনা করা হয়।`,
+                render: () => renderCallZone('Thursday', 'hd', 'half_day', true, true),
+                output: "It's a half day.",
+                takeaway: { title: 'Go-তে JS-style enum প্যাটার্নের সারমর্ম', detail: 'type X underlyingType দিয়ে নতুন named type বানাও, তারপর const (...) ব্লকে iota বা literal value দিয়ে enum members ডিফাইন করো। এটা type safety দেয়, IDE autocomplete দেয়, আর == দিয়ে সরাসরি তুলনা করা যায় — JS/TS enum-এর Go-স্টাইল বিকল্প।' },
+                jsCompare: { title: 'JS/TS তুলনা', code: `// TypeScript\nenum OfficeStatus {\n  WorkingDay = "open",\n  HalfDay = "half_day",\n  OffDay = "closed",\n}\n\n// Go (equivalent idea)\ntype OfficeStatus string\nconst (\n  WorkingDay OfficeStatus = "open"\n  HalfDay    OfficeStatus = "half_day"\n  OffDay     OfficeStatus = "closed"\n)` }
+            }
+        ];
+
+        /* =========================================================================
+           RENDER: CODE
+        ========================================================================= */
+        const codeView = document.getElementById('codeView');
+        function renderCode() {
+            codeView.innerHTML = codeLines.map((l, i) => `<div class="line" id="line-${i}"><span class="ln">${i + 1}</span>${l.html}</div>`).join('');
+        }
+        renderCode();
+
+        function highlightLines(activeLines, dimLines) {
+            document.querySelectorAll('.line').forEach(el => el.classList.remove('active', 'faded'));
+            (dimLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('faded'); });
+            (activeLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('active'); });
+        }
+
+        /* =========================================================================
+           RENDER: STEPPER
+        ========================================================================= */
+        const stepTrackInner = document.getElementById('stepTrackInner');
+        function renderStepperNodes() {
+            stepTrackInner.innerHTML = steps.map((s, i) => `
+    <div class="step" id="step-${i}">
+      <div class="step-node">${i + 1}</div>
+      <div class="step-label">${STEP_LABELS[i]}</div>
+    </div>`).join('');
+        }
+        renderStepperNodes();
+
+        function updateStepper(idx) {
+            document.querySelectorAll('.step').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                if (i < idx) el.classList.add('done');
+                if (i === idx) el.classList.add('active');
+            });
+            const pct = steps.length > 1 ? (idx / (steps.length - 1)) * 100 : 0;
+            document.getElementById('stepperProgress').style.width = (idx < 0 ? 0 : pct) + '%';
+        }
+
+        /* =========================================================================
+           MAIN STEP RENDER
+        ========================================================================= */
+        let currentStep = -1;
+        const visWrap = document.getElementById('visWrap');
+
+        function renderStep(step) {
+            highlightLines(step.activeLines, step.dimLines);
+            document.getElementById('phaseTag').textContent = step.phase;
+            visWrap.innerHTML = step.render();
+
+            document.getElementById('consoleMsg').innerHTML = step.console;
+            updateStepper(step.node);
+
+            const extraRow = document.getElementById('extraRow');
+            if (step.output) {
+                let wrap = extraRow.querySelector('.output-row');
+                if (!wrap) {
+                    wrap = document.createElement('div');
+                    wrap.className = 'output-row';
+                    extraRow.appendChild(wrap);
+                }
+                const chip = document.createElement('div');
+                chip.className = 'output-chip';
+                chip.textContent = step.output;
+                wrap.appendChild(chip);
+            }
+            if (step.takeaway) {
+                const card = document.createElement('div');
+                card.className = 'takeaway-card';
+                card.innerHTML = `<div class="tt">${step.takeaway.title}</div><div class="td">${step.takeaway.detail}</div>`;
+                extraRow.appendChild(card);
+            }
+            if (step.jsCompare) {
+                const card = document.createElement('div');
+                card.className = 'js-compare';
+                card.innerHTML = `<div class="jc-title">${step.jsCompare.title}</div><pre style="margin:0;white-space:pre-wrap;">${step.jsCompare.code.replace(/</g, '&lt;')}</pre>`;
+                extraRow.appendChild(card);
+            }
+        }
+
+        /* =========================================================================
+           CONTROLS
+        ========================================================================= */
+        function nextStep() {
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                renderStep(steps[currentStep]);
+                if (currentStep === steps.length - 1) {
+                    document.getElementById('btnNext').disabled = true;
+                }
+            }
+        }
+
+        function resetSim() {
+            currentStep = -1;
+            document.getElementById('extraRow').innerHTML = '';
+            highlightLines([], []);
+            document.getElementById('phaseTag').textContent = 'idle';
+            updateStepper(-1);
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('consoleMsg').innerHTML = 'Press <b>Next step</b> to begin.';
+            visWrap.innerHTML = steps[0] ? steps[0].render() : '';
+        }
+
+        resetSim();
+    </script>
+</body>
+
+</html>
