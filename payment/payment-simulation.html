@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Interfaces Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e14;
+            --panel: #11161f;
+            --panel-2: #0d121a;
+            --line: #232b38;
+            --line-soft: #1a212c;
+            --text: #c7d0dc;
+            --text-dim: #6b7686;
+            --text-bright: #eef2f7;
+
+            --stack: #ff8a7a;
+            --stack-dim: #5a3934;
+            --heap: #4fd8a8;
+            --heap-dim: #2f4a3f;
+            --code: #8aa6ff;
+            --code-dim: #36406b;
+            --pointer: #ffcc66;
+            --value: #c792ea;
+            --value-dim: #4a3a5a;
+
+            --kw: #ff8a7a;
+            --type: #ffb454;
+            --str: #4fd8a8;
+            --com: #5b6677;
+            --fn: #8aa6ff;
+
+            --sans: 'Space Grotesk', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 28px 40px;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(138, 166, 255, 0.08), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(79, 216, 168, 0.06), transparent 40%),
+                var(--bg);
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            max-width: 1480px;
+            margin: 0 auto 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        .masthead h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-bright);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .masthead h1 .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--pointer);
+            box-shadow: 0 0 12px var(--pointer);
+        }
+
+        .masthead .sub {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 0.95fr 1.5fr;
+            gap: 18px;
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        /* ---------- Code panel with tabs ---------- */
+        .code-panel .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0 6px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+            overflow-x: auto;
+        }
+
+        .file-tab {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            padding: 11px 14px 9px;
+            cursor: default;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all .2s ease;
+        }
+
+        .file-tab .fdot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-dim);
+        }
+
+        .file-tab.active {
+            color: var(--text-bright);
+            border-bottom-color: var(--code);
+        }
+
+        .file-tab.active .fdot {
+            background: var(--code);
+            box-shadow: 0 0 6px var(--code);
+        }
+
+        .file-tab.flash {
+            animation: tabFlash .8s ease;
+        }
+
+        @keyframes tabFlash {
+
+            0%,
+            100% {
+                background: transparent;
+            }
+
+            30% {
+                background: rgba(138, 166, 255, 0.18);
+            }
+        }
+
+        .code-container {
+            font-family: var(--mono);
+            line-height: 1.72;
+            font-size: 13.5px;
+            padding: 14px 0 18px;
+            white-space: pre;
+            overflow-x: auto;
+            min-height: 480px;
+        }
+
+        .code-file {
+            display: none;
+        }
+
+        .code-file.active {
+            display: block;
+        }
+
+        .line {
+            position: relative;
+            padding: 1px 18px 1px 50px;
+            transition: background-color .25s ease, border-color .25s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .line .ln {
+            position: absolute;
+            left: 16px;
+            width: 24px;
+            text-align: right;
+            color: #3a4250;
+            font-size: 12px;
+            user-select: none;
+        }
+
+        .line.active {
+            background: linear-gradient(90deg, rgba(138, 166, 255, 0.14), rgba(138, 166, 255, 0.03) 70%);
+            border-left-color: var(--code);
+        }
+
+        .line.faded {
+            opacity: 0.4;
+        }
+
+        .kw {
+            color: var(--kw);
+            font-weight: 600;
+        }
+
+        .type {
+            color: var(--type);
+        }
+
+        .com {
+            color: var(--com);
+            font-style: italic;
+        }
+
+        .fn {
+            color: var(--fn);
+        }
+
+        .str {
+            color: var(--str);
+        }
+
+        /* ---------- RAM layout ---------- */
+        .ram-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .ram-head .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .ram-head .phase {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.08);
+            border: 1px solid rgba(255, 204, 102, 0.25);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .ram-wrap {
+            position: relative;
+            padding: 18px;
+        }
+
+        .ram-layout {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            position: relative;
+        }
+
+        .segment {
+            position: relative;
+            border-radius: 8px;
+            padding: 12px 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            min-height: 440px;
+            background: var(--panel-2);
+        }
+
+        .segment.stack {
+            border: 1.5px dashed var(--stack-dim);
+        }
+
+        .segment.heap {
+            border: 1.5px solid var(--heap-dim);
+        }
+
+        .segment.codeseg {
+            border: 1.5px solid var(--code-dim);
+        }
+
+        .segment-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 2px;
+        }
+
+        .segment-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.25;
+        }
+
+        .stack .segment-title {
+            color: var(--stack);
+        }
+
+        .heap .segment-title {
+            color: var(--heap);
+        }
+
+        .codeseg .segment-title {
+            color: var(--code);
+        }
+
+        .stack-frames,
+        .heap-blocks,
+        .code-blocks {
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .stack-frames {
+            margin-top: auto;
+        }
+
+        .mem-block {
+            border-radius: 7px;
+            padding: 9px 11px 10px;
+            font-family: var(--mono);
+            font-size: 12px;
+            background: #161d27;
+            animation: blockIn .38s cubic-bezier(.25, 1, .5, 1);
+            position: relative;
+        }
+
+        @keyframes blockIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .mem-block .blk-title {
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 5px;
+        }
+
+        .mem-block .blk-addr {
+            font-size: 9.5px;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .mem-block .row {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            color: var(--text);
+            flex-wrap: wrap;
+        }
+
+        .mem-block .row .k {
+            color: var(--text-dim);
+        }
+
+        .mem-block .row .v {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .mem-block .row .v.nil {
+            color: var(--text-dim);
+            font-style: italic;
+            font-weight: 400;
+        }
+
+        .mem-block .row .v.ptr {
+            color: var(--pointer);
+        }
+
+        .mem-block .row .v.changed {
+            color: var(--stack);
+        }
+
+        .mem-block .row .v.pulse {
+            animation: pulseVal .6s ease;
+        }
+
+        @keyframes pulseVal {
+            0% {
+                color: var(--pointer);
+                text-shadow: 0 0 10px rgba(255, 204, 102, 0.7);
+            }
+
+            100% {
+                text-shadow: none;
+            }
+        }
+
+        .stack-frame {
+            border-left: 3px solid var(--stack);
+        }
+
+        .heap-frame {
+            border-left: 3px solid var(--heap);
+        }
+
+        .code-frame {
+            border-left: 3px solid var(--code);
+            opacity: 0.92;
+        }
+
+        .iface-frame {
+            border-left: 3px solid var(--pointer);
+            background: linear-gradient(135deg, #1b2118, #161d27);
+        }
+
+        .iface-frame .blk-title {
+            color: var(--pointer);
+        }
+
+        .copy-frame {
+            border-left: 3px solid var(--value);
+            background: linear-gradient(135deg, #1c1726, #161d27);
+        }
+
+        .copy-frame .blk-title {
+            color: var(--value);
+        }
+
+        .mem-block.ghost {
+            opacity: 0.3;
+            background: repeating-linear-gradient(135deg, #161d27, #161d27 8px, #11161f 8px, #11161f 16px);
+        }
+
+        .mem-block.ghost .blk-title {
+            color: var(--text-dim);
+        }
+
+        .mem-block.ghost::after {
+            content: 'COPY · DISCARDED';
+            position: absolute;
+            top: 6px;
+            right: 9px;
+            font-size: 8.5px;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 20px;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .tag.ptr-tag {
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.1);
+            border: 1px solid rgba(255, 204, 102, 0.35);
+        }
+
+        .tag.val-tag {
+            color: var(--value);
+            background: rgba(199, 146, 234, 0.1);
+            border: 1px solid rgba(199, 146, 234, 0.35);
+        }
+
+        /* arrow overlay */
+        .arrow-overlay {
+            position: absolute;
+            inset: 18px;
+            pointer-events: none;
+            z-index: 5;
+            overflow: visible;
+        }
+
+        .arrow-overlay path {
+            fill: none;
+            stroke-width: 2;
+            stroke-dasharray: 5 4;
+            stroke-dashoffset: 220;
+            opacity: 0;
+        }
+
+        .arrow-overlay path.solid {
+            stroke: var(--pointer);
+            filter: drop-shadow(0 0 4px rgba(255, 204, 102, 0.5));
+        }
+
+        .arrow-overlay path.dashed-purple {
+            stroke: var(--value);
+            stroke-dasharray: 3 5;
+            filter: drop-shadow(0 0 4px rgba(199, 146, 234, 0.45));
+        }
+
+        .arrow-overlay path.show {
+            animation: drawArrow .6s ease forwards;
+        }
+
+        @keyframes drawArrow {
+            0% {
+                stroke-dashoffset: 220;
+                opacity: 0;
+            }
+
+            15% {
+                opacity: 1;
+            }
+
+            100% {
+                stroke-dashoffset: 0;
+                opacity: 1;
+            }
+        }
+
+        .arrow-overlay circle {
+            opacity: 0;
+        }
+
+        .arrow-overlay circle.solid {
+            fill: var(--pointer);
+        }
+
+        .arrow-overlay circle.dashed-purple {
+            fill: var(--value);
+        }
+
+        .arrow-overlay circle.show {
+            animation: dotIn .3s ease forwards .55s;
+        }
+
+        @keyframes dotIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .arrow-overlay text {
+            font-family: var(--mono);
+            font-size: 10px;
+            opacity: 0;
+        }
+
+        .arrow-overlay text.show {
+            animation: dotIn .3s ease forwards .6s;
+        }
+
+        /* ---------- Bottom panel ---------- */
+        .bottom-panel {
+            grid-column: 1 / -1;
+            padding: 20px 22px;
+        }
+
+        .scenario-switch {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .scenario-btn {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--panel-2);
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all .2s ease;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .scenario-btn .sdot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .scenario-btn[data-scenario="bkash"] .sdot {
+            background: var(--pointer);
+        }
+
+        .scenario-btn[data-scenario="mock"] .sdot {
+            background: var(--value);
+        }
+
+        .scenario-btn.active {
+            color: var(--text-bright);
+            border-color: #3a4555;
+            background: #161d27;
+        }
+
+        .scenario-btn.active[data-scenario="bkash"] {
+            border-color: rgba(255, 204, 102, 0.4);
+            box-shadow: 0 0 0 1px rgba(255, 204, 102, 0.15) inset;
+        }
+
+        .scenario-btn.active[data-scenario="mock"] {
+            border-color: rgba(199, 146, 234, 0.4);
+            box-shadow: 0 0 0 1px rgba(199, 146, 234, 0.15) inset;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+            margin-bottom: 24px;
+            padding: 0 10px;
+        }
+
+        .stepper::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background: var(--line);
+            z-index: 1;
+        }
+
+        .stepper .progress {
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            height: 2px;
+            z-index: 2;
+            transition: width .4s cubic-bezier(.25, 1, .5, 1);
+            width: 0%;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 7px;
+            z-index: 3;
+            width: 90px;
+        }
+
+        .step-node {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            border: 2px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .step.active .step-node {
+            box-shadow: 0 0 14px currentColor;
+        }
+
+        .step .step-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
+            letter-spacing: 0.02em;
+        }
+
+        .step.active .step-label {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 13.5px;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #3a4555;
+            background: #161d27;
+            transform: translateY(-1px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #btnNext {
+            background: linear-gradient(135deg, #6f8cff, #8aa6ff);
+            color: #0a0e14;
+            border-color: transparent;
+        }
+
+        #btnNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        #btnReset {}
+
+        .console-box {
+            background: #05070a;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--code);
+            padding: 14px 16px;
+            border-radius: 7px;
+            font-size: 13.5px;
+            line-height: 1.65;
+            min-height: 54px;
+            transition: border-left-color .3s ease;
+        }
+
+        .console-box .hl {
+            color: var(--pointer);
+            font-weight: 700;
+        }
+
+        .console-box .hl-heap {
+            color: var(--heap);
+            font-weight: 700;
+        }
+
+        .console-box .hl-stack {
+            color: var(--stack);
+            font-weight: 700;
+        }
+
+        .console-box .hl-val {
+            color: var(--value);
+            font-weight: 700;
+        }
+
+        .console-box .hl-code {
+            color: var(--fn);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .verdict-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .verdict-card {
+            flex: 1;
+            min-width: 220px;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12.5px;
+            border: 1px solid var(--line);
+            background: var(--panel-2);
+            opacity: 0;
+            animation: chipIn .4s ease forwards;
+        }
+
+        .verdict-card.ptr {
+            border-left: 3px solid var(--pointer);
+        }
+
+        .verdict-card.val {
+            border-left: 3px solid var(--value);
+        }
+
+        .verdict-card .vt {
+            font-weight: 700;
+            font-size: 11.5px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .verdict-card.ptr .vt {
+            color: var(--pointer);
+        }
+
+        .verdict-card.val .vt {
+            color: var(--value);
+        }
+
+        .verdict-card .vd {
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 11.5px;
+        }
+
+        @keyframes chipIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .console-output {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: rgba(79, 216, 168, 0.06);
+            border: 1px solid rgba(79, 216, 168, 0.25);
+            color: var(--heap);
+            padding: 4px 9px;
+            border-radius: 5px;
+            margin-top: 8px;
+            opacity: 0;
+            animation: chipIn .35s ease forwards;
+            display: inline-block;
+        }
+
+        @media (max-width: 980px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .step .step-label {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="masthead">
+        <h1><span class="dot"></span>Go Interfaces — Pointer vs Value Receiver</h1>
+        <div class="sub">interface dispatch · stack · heap · code segment</div>
+    </div>
+
+    <div class="container">
+        <!-- LEFT: CODE -->
+        <div class="panel code-panel">
+            <div class="panel-head" id="fileTabs"></div>
+            <div class="code-container" id="codeView"></div>
+        </div>
+
+        <!-- RIGHT: RAM -->
+        <div class="panel ram-panel">
+            <div class="ram-head">
+                <div class="label">Runtime Memory Layout</div>
+                <div class="phase" id="phaseTag">idle</div>
+            </div>
+            <div class="ram-wrap">
+                <div class="ram-layout" id="ramLayout">
+                    <div class="segment stack" id="stackSeg">
+                        <div class="segment-title">stack</div>
+                        <div class="stack-frames" id="stackFrames"></div>
+                    </div>
+                    <div class="segment heap" id="heapSeg">
+                        <div class="segment-title">heap</div>
+                        <div class="heap-blocks" id="heapBlocks"></div>
+                    </div>
+                    <div class="segment codeseg" id="codeSegEl">
+                        <div class="segment-title">code segment</div>
+                        <div class="code-blocks" id="codeBlocks"></div>
+                    </div>
+                </div>
+                <svg class="arrow-overlay" id="arrowOverlay"></svg>
+            </div>
+        </div>
+
+        <!-- BOTTOM: CONTROLS -->
+        <div class="panel bottom-panel">
+            <div class="scenario-switch" id="scenarioSwitch">
+                <button class="scenario-btn active" data-scenario="bkash" onclick="switchScenario('bkash')"><span
+                        class="sdot"></span>bKash · pointer receiver</button>
+                <button class="scenario-btn" data-scenario="mock" onclick="switchScenario('mock')"><span
+                        class="sdot"></span>Mock · value receiver</button>
+            </div>
+
+            <div class="stepper" id="stepper"></div>
+
+            <div class="controls">
+                <button id="btnNext" onclick="nextStep()">Next step ▶</button>
+                <button id="btnReset" onclick="resetSim()">↺ Reset</button>
+            </div>
+
+            <div class="console-box" id="consoleMsg">একটা scenario বেছে নিয়ে <b>Next step</b> চাপো।</div>
+            <div id="verdictRow"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================
+           SOURCE FILES
+        ========================================================= */
+        const files = {
+            main: {
+                label: 'main.go',
+                lines: [
+                    { html: '<span class="kw">package</span> main' },
+                    { html: '' },
+                    { html: '<span class="kw">import</span> <span class="str">"fmt"</span>' },
+                    { html: '' },
+                    { html: '<span class="kw">func</span> main() {' },
+                    { html: '    fmt.Println(<span class="str">"=== RUNNING MULTI-FILE ARCHITECTURE ==="</span>)' },
+                    { html: '' },
+                    { html: '    <span class="com">// ১. bKash টেস্ট (পয়েন্টার ফ্লো)</span>' },
+                    { html: '    myBkash := Bkash{WalletNumber: <span class="str">"017..."</span>, Balance: <span class="type">1000.00</span>}' },
+                    { html: '    bkashService := NewPaymentService(&amp;myBkash)' },
+                    { html: '    bkashService.Checkout(<span class="type">200.00</span>)' },
+                    { html: '    fmt.Printf(<span class="str">"bKash balance: %.2f\\n"</span>, myBkash.Balance)' },
+                    { html: '' },
+                    { html: '    <span class="com">// ২. Mock টেস্ট (ভ্যালু ফ্লো)</span>' },
+                    { html: '    myMock := MockPayment{IsTested: <span class="kw">false</span>}' },
+                    { html: '    mockService := NewPaymentService(myMock)' },
+                    { html: '    mockService.Checkout(<span class="type">10.00</span>)' },
+                    { html: '    fmt.Printf(<span class="str">"Mock IsTested: %t\\n"</span>, myMock.IsTested)' },
+                    { html: '}' },
+                ]
+            },
+            interfaces: {
+                label: 'interfaces.go',
+                lines: [
+                    { html: '<span class="kw">package</span> main' },
+                    { html: '' },
+                    { html: '<span class="com">// চুক্তিনামা — শুধু Pay() মেথডের নিয়ম</span>' },
+                    { html: '<span class="kw">type</span> PaymentProcessor <span class="kw">interface</span> {' },
+                    { html: '    Pay(amount <span class="type">float64</span>)' },
+                    { html: '}' },
+                    { html: '' },
+                    { html: '<span class="kw">type</span> PaymentService <span class="kw">struct</span> {' },
+                    { html: '    method PaymentProcessor <span class="com">// খালি স্লট</span>' },
+                    { html: '}' },
+                    { html: '' },
+                    { html: '<span class="kw">func</span> NewPaymentService(mp PaymentProcessor) *PaymentService {' },
+                    { html: '    <span class="kw">return</span> &amp;PaymentService{method: mp}' },
+                    { html: '}' },
+                    { html: '' },
+                    { html: '<span class="kw">func</span> (ps PaymentService) Checkout(amount <span class="type">float64</span>) {' },
+                    { html: '    ps.method.Pay(amount) <span class="com">// dispatch → concrete Pay()</span>' },
+                    { html: '}' },
+                ]
+            },
+            methods: {
+                label: 'methods.go',
+                lines: [
+                    { html: '<span class="kw">package</span> main' },
+                    { html: '' },
+                    { html: '<span class="kw">import</span> <span class="str">"fmt"</span>' },
+                    { html: '' },
+                    { html: '<span class="kw">type</span> Bkash <span class="kw">struct</span> {' },
+                    { html: '    WalletNumber <span class="type">string</span>' },
+                    { html: '    Balance      <span class="type">float64</span>' },
+                    { html: '}' },
+                    { html: '' },
+                    { html: '<span class="com">// Pointer Receiver → আসল মেমোরি আপডেট করে</span>' },
+                    { html: '<span class="kw">func</span> (bk *Bkash) Pay(amount <span class="type">float64</span>) {' },
+                    { html: '    bk.Balance -= amount' },
+                    { html: '    fmt.Printf(<span class="str">"[bKash] %.2f tk paid. Rest: %.2f tk\\n"</span>, amount, bk.Balance)' },
+                    { html: '}' },
+                ]
+            },
+            mock: {
+                label: 'mock.go',
+                lines: [
+                    { html: '<span class="kw">package</span> main' },
+                    { html: '' },
+                    { html: '<span class="kw">import</span> <span class="str">"fmt"</span>' },
+                    { html: '' },
+                    { html: '<span class="kw">type</span> MockPayment <span class="kw">struct</span> {' },
+                    { html: '    IsTested <span class="type">bool</span>' },
+                    { html: '}' },
+                    { html: '' },
+                    { html: '<span class="com">// Value Receiver → শুধু কপিতে কাজ করে</span>' },
+                    { html: '<span class="kw">func</span> (m MockPayment) Pay(amount <span class="type">float64</span>) {' },
+                    { html: '    m.IsTested = <span class="kw">true</span> <span class="com">// লোকাল কপি বদলায়</span>' },
+                    { html: '    fmt.Printf(<span class="str">"[Mock] tested (copy) = %t\\n"</span>, m.IsTested)' },
+                    { html: '}' },
+                ]
+            }
+        };
+
+        const codeSegBlocks = `
+  <div class="mem-block code-frame">
+    <div class="blk-title">main() <span class="blk-addr">0x4a1000</span></div>
+    <div class="row">build Bkash &amp; MockPayment</div>
+    <div class="row">call Checkout x2</div>
+  </div>
+  <div class="mem-block code-frame">
+    <div class="blk-title">Checkout() <span class="blk-addr">0x4a1100</span></div>
+    <div class="row">ps.method.Pay(amount)</div>
+  </div>
+  <div class="mem-block code-frame">
+    <div class="blk-title">(*Bkash).Pay() <span class="blk-addr">0x4a1240</span></div>
+    <div class="row">bk.Balance -= amount</div>
+  </div>
+  <div class="mem-block code-frame">
+    <div class="blk-title">(MockPayment).Pay() <span class="blk-addr">0x4a13a0</span></div>
+    <div class="row">m.IsTested = true</div>
+  </div>
+`;
+
+        const STEP_LABELS = ['vars', 'inject', 'checkout', 'dispatch', 'mutate', 'result'];
+
+        /* =========================================================
+           SCENARIO: bKash (pointer receiver)
+        ========================================================= */
+        const bkashSteps = [
+            {
+                file: 'main', activeLines: [8], node: 0, phase: 'struct created',
+                console: `<span class="hl-code">main()</span>-এ <span class="hl">myBkash</span> struct তৈরি হলো stack-এ — <span class="hl">Balance = 1000.00</span>। এখনো কোনো interface বা service জড়িত হয়নি, শুধু plain data।`,
+                stack: [{ id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '1000.00' }] }],
+                heap: [], arrows: []
+            },
+            {
+                file: 'main', activeLines: [9], node: 1, phase: 'address injected',
+                console: `<span class="hl">&amp;myBkash</span> — মেমোরি অ্যাড্রেস পাঠানো হলো, ভ্যালু না! <span class="hl-code">NewPaymentService()</span> সেই pointer-কে interface slot <span class="hl">method</span>-এর ভেতর রাখলো। কোনো copy হয়নি — service-টা সরাসরি myBkash-এর ঠিকানা ধরে আছে।`,
+                stack: [
+                    { id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '1000.00' }] },
+                    { id: 'svc', title: 'bkashService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020010', cls: 'iface-frame', rows: [{ k: 'method.type', v: '*Bkash', isPtr: true }, { k: 'method.data', v: '&myBkash', isPtr: true }] }
+                ],
+                arrows: [{ from: 'svc', to: 'psBox', style: 'solid' }, { from: 'psBox', to: 'myBkash', style: 'solid', label: 'points to' }]
+            },
+            {
+                file: 'main', activeLines: [10], node: 2, phase: 'Checkout() called',
+                console: `<span class="hl">bkashService.Checkout(200.00)</span> কল হলো। এটা <span class="hl-code">interfaces.go</span>-এ থাকা <span class="hl">Checkout()</span> মেথডে jump করলো — যেখানে <span class="hl">ps.method.Pay(amount)</span> লেখা আছে।`,
+                stack: [
+                    { id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '1000.00' }] },
+                    { id: 'svc', title: 'bkashService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=200.00)', cls: 'stack-frame', rows: [{ k: 'ps', v: 'bkashService' }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020010', cls: 'iface-frame', rows: [{ k: 'method.type', v: '*Bkash', isPtr: true }, { k: 'method.data', v: '&myBkash', isPtr: true }] }
+                ],
+                arrows: [{ from: 'checkoutFrame', to: 'psBox', style: 'solid' }, { from: 'psBox', to: 'myBkash', style: 'solid' }],
+                fileTo: 'interfaces', activeLines2: [15]
+            },
+            {
+                file: 'interfaces', activeLines: [15], node: 3, phase: 'interface dispatch',
+                console: `<span class="hl">ps.method.Pay(amount)</span> — runtime এখন interface slot-এর ভেতরে রাখা <span class="hl">type</span> দেখে বুঝলো এটা <span class="hl">*Bkash</span>, তাই dispatch করে সরাসরি <span class="hl-code">(*Bkash).Pay()</span>-এ (methods.go) লাফ দিলো। এটাই dynamic dispatch।`,
+                stack: [
+                    { id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '1000.00' }] },
+                    { id: 'svc', title: 'bkashService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=200.00)', cls: 'stack-frame', rows: [{ k: 'ps', v: 'bkashService' }] },
+                    { id: 'payFrame', title: '(*Bkash).Pay(amount=200.00)', cls: 'stack-frame', rows: [{ k: 'bk', v: '&myBkash', isPtr: true }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020010', cls: 'iface-frame', rows: [{ k: 'method.type', v: '*Bkash', isPtr: true }, { k: 'method.data', v: '&myBkash', isPtr: true }] }
+                ],
+                arrows: [{ from: 'payFrame', to: 'myBkash', style: 'solid', label: 'dereference' }],
+                fileTo: 'methods', activeLines2: [10, 11]
+            },
+            {
+                file: 'methods', activeLines: [10, 11], node: 4, phase: 'real memory mutated',
+                console: `<span class="hl">bk.Balance -= amount</span> — <span class="hl">bk</span> একটা pointer, তাই এই লাইন <span class="hl-stack">myBkash-এর আসল মেমোরি</span>-তেই গিয়ে লেখে। কোনো copy নেই। <span class="hl">Balance</span> সরাসরি <span class="hl">1000.00 → 800.00</span> হয়ে গেলো — main() এই বদল দেখতে পাবে।`,
+                stack: [
+                    { id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '800.00' }], badge: 'mutated' },
+                    { id: 'svc', title: 'bkashService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=200.00)', cls: 'stack-frame ghost', rows: [{ k: 'ps', v: 'bkashService' }] },
+                    { id: 'payFrame', title: '(*Bkash).Pay(amount=200.00)', cls: 'stack-frame ghost', rows: [{ k: 'bk', v: '&myBkash', isPtr: true }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020010', cls: 'iface-frame', rows: [{ k: 'method.type', v: '*Bkash', isPtr: true }, { k: 'method.data', v: '&myBkash', isPtr: true }] }
+                ],
+                arrows: [{ from: 'payFrame', to: 'myBkash', style: 'solid', label: 'writes through' }],
+                fileTo: 'main', activeLines2: [11]
+            },
+            {
+                file: 'main', activeLines: [11], node: 5, phase: 'verified in main()',
+                console: `Stack frame-গুলো (Checkout, Pay) এখন pop হয়ে গেছে, কিন্তু <span class="hl">myBkash.Balance</span> স্থায়ীভাবে বদলে গেছে। <span class="hl-code">main()</span>-এ ফিরে এসে <span class="hl">myBkash.Balance</span> print করলে <span class="hl-stack">800.00</span> পাওয়া যাবে — pointer receiver বলেই এই persistence সম্ভব হলো।`,
+                stack: [{ id: 'myBkash', title: 'myBkash', cls: 'stack-frame', rows: [{ k: 'WalletNumber', v: '"017..."' }, { k: 'Balance', v: '800.00' }], badge: 'final' }],
+                heap: [], arrows: [],
+                output: '[bKash] 200.00 tk Payment is Successful. Rest of your balance: 800.00 tk\n[Main] Main memory bKash balance: 800.00 tk',
+                verdict: {
+                    type: 'ptr',
+                    title: '✓ Pointer Receiver',
+                    detail: 'func (bk *Bkash) Pay() → bk মূল struct-এর address ধরে আছে → Balance-এর বদল সব জায়গায় দৃশ্যমান।'
+                }
+            }
+        ];
+
+        /* =========================================================
+           SCENARIO: Mock (value receiver)
+        ========================================================= */
+        const mockSteps = [
+            {
+                file: 'main', activeLines: [14], node: 0, phase: 'struct created',
+                console: `<span class="hl-code">main()</span>-এ <span class="hl">myMock</span> struct তৈরি হলো — <span class="hl">IsTested = false</span>। সাধারণ stack-based ভ্যালু।`,
+                stack: [{ id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }] }],
+                heap: [], arrows: []
+            },
+            {
+                file: 'main', activeLines: [15], node: 1, phase: 'value injected (copied)',
+                console: `<span class="hl-val">myMock</span> — এখানে কোনো <span class="hl">&amp;</span> নেই! সরাসরি ভ্যালু পাঠানো হলো, তাই Go এটার একটা <span class="hl-val">সম্পূর্ণ কপি</span> বানিয়ে interface slot-এ রাখলো। এখন দুটো আলাদা <span class="hl">MockPayment</span> অস্তিত্বে আছে — আসল আর কপি।`,
+                stack: [
+                    { id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }] },
+                    { id: 'svc', title: 'mockService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020090', cls: 'iface-frame', rows: [{ k: 'method.type', v: 'MockPayment' }, { k: 'method.data', v: 'copy of myMock' }] },
+                    { id: 'copyBox', title: 'MockPayment (copy)', addr: '0xc0000200a8', cls: 'copy-frame', rows: [{ k: 'IsTested', v: 'false' }] }
+                ],
+                arrows: [{ from: 'svc', to: 'psBox', style: 'solid' }, { from: 'psBox', to: 'copyBox', style: 'dashed-purple', label: 'owns a copy' }]
+            },
+            {
+                file: 'main', activeLines: [16], node: 2, phase: 'Checkout() called',
+                console: `<span class="hl">mockService.Checkout(10.00)</span> কল হলো — আগের bKash-এর মতোই <span class="hl-code">Checkout()</span>-এ jump করলো।`,
+                stack: [
+                    { id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }] },
+                    { id: 'svc', title: 'mockService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=10.00)', cls: 'stack-frame', rows: [{ k: 'ps', v: 'mockService' }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020090', cls: 'iface-frame', rows: [{ k: 'method.type', v: 'MockPayment' }, { k: 'method.data', v: 'copy of myMock' }] },
+                    { id: 'copyBox', title: 'MockPayment (copy)', addr: '0xc0000200a8', cls: 'copy-frame', rows: [{ k: 'IsTested', v: 'false' }] }
+                ],
+                arrows: [{ from: 'checkoutFrame', to: 'psBox', style: 'solid' }, { from: 'psBox', to: 'copyBox', style: 'dashed-purple' }],
+                fileTo: 'interfaces', activeLines2: [15]
+            },
+            {
+                file: 'interfaces', activeLines: [15], node: 3, phase: 'interface dispatch',
+                console: `<span class="hl">ps.method.Pay(amount)</span> — interface slot দেখলো type-টা <span class="hl-val">MockPayment</span> (pointer না!), তাই dispatch করলো <span class="hl-code">(MockPayment).Pay()</span>-এ (mock.go)। কিন্তু receiver <span class="hl">m</span> এখন আবার <span class="hl-val">একটা নতুন কপি</span> পাবে — heap-এর copy থেকেও আরেকটা কপি!`,
+                stack: [
+                    { id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }] },
+                    { id: 'svc', title: 'mockService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=10.00)', cls: 'stack-frame', rows: [{ k: 'ps', v: 'mockService' }] },
+                    { id: 'payFrame', title: '(MockPayment).Pay(amount=10.00)', cls: 'stack-frame copy-frame', rows: [{ k: 'm (local copy)', v: 'IsTested=false' }] }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020090', cls: 'iface-frame', rows: [{ k: 'method.type', v: 'MockPayment' }, { k: 'method.data', v: 'copy of myMock' }] },
+                    { id: 'copyBox', title: 'MockPayment (copy)', addr: '0xc0000200a8', cls: 'copy-frame', rows: [{ k: 'IsTested', v: 'false' }] }
+                ],
+                arrows: [{ from: 'payFrame', to: 'copyBox', style: 'dashed-purple', label: 'copies again' }],
+                fileTo: 'mock', activeLines2: [10, 11]
+            },
+            {
+                file: 'mock', activeLines: [10, 11], node: 4, phase: 'only the copy mutates',
+                console: `<span class="hl">m.IsTested = true</span> — এই বদলটা শুধু <span class="hl-val">m</span>-এর লোকাল কপিতে ঘটলো (Pay() ফাংশনের নিজস্ব stack frame-এ)। আসল <span class="hl">myMock</span> বা heap-এর copy — কোনোটাই বদলায়নি! Pay() রিটার্ন করলেই এই কপিও মুছে যাবে।`,
+                stack: [
+                    { id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }] },
+                    { id: 'svc', title: 'mockService', cls: 'stack-frame', rows: [{ k: 'method', v: '→ heap', isPtr: true }] },
+                    { id: 'checkoutFrame', title: 'Checkout(amount=10.00)', cls: 'stack-frame ghost', rows: [{ k: 'ps', v: 'mockService' }] },
+                    { id: 'payFrame', title: '(MockPayment).Pay(amount=10.00)', cls: 'stack-frame copy-frame', rows: [{ k: 'm (local copy)', v: 'IsTested=true' }], badge: 'local only' }
+                ],
+                heap: [
+                    { id: 'psBox', title: 'PaymentService', addr: '0xc000020090', cls: 'iface-frame', rows: [{ k: 'method.type', v: 'MockPayment' }, { k: 'method.data', v: 'copy of myMock' }] },
+                    { id: 'copyBox', title: 'MockPayment (copy)', addr: '0xc0000200a8', cls: 'copy-frame', rows: [{ k: 'IsTested', v: 'false' }] }
+                ],
+                arrows: [],
+                fileTo: 'main', activeLines2: [17]
+            },
+            {
+                file: 'main', activeLines: [17], node: 5, phase: 'verified in main()',
+                console: `<span class="hl-code">Pay()</span> আর <span class="hl-code">Checkout()</span>-এর frame pop হয়ে গেছে — সেই কপিটাও সাথে সাথে উড়ে গেছে। <span class="hl-code">main()</span>-এ ফিরে এসে <span class="hl">myMock.IsTested</span> print করলে এখনো <span class="hl-val">false</span> পাওয়া যাবে — কারণ আসল ভ্যালুতে কখনো হাত-ই পড়েনি।`,
+                stack: [{ id: 'myMock', title: 'myMock', cls: 'stack-frame', rows: [{ k: 'IsTested', v: 'false' }], badge: 'unchanged' }],
+                heap: [], arrows: [],
+                output: '[Mock] Payment test is successful. (Copied IsTested = true)\n[Main] Main memory Mock IsTested - value: false',
+                verdict: {
+                    type: 'val',
+                    title: '✗ Value Receiver',
+                    detail: 'func (m MockPayment) Pay() → m শুধু একটা কপি। আসল myMock.IsTested চিরকাল false-ই থাকলো।'
+                }
+            }
+        ];
+
+        const scenarios = { bkash: bkashSteps, mock: mockSteps };
+        let activeScenario = 'bkash';
+        let currentStep = -1;
+        let prevStackRows = {};
+        let prevHeapRows = {};
+
+        /* =========================================================
+           RENDER FILE TABS + CODE
+        ========================================================= */
+        const fileTabsEl = document.getElementById('fileTabs');
+        const codeView = document.getElementById('codeView');
+        const fileOrder = ['main', 'interfaces', 'methods', 'mock'];
+
+        function renderTabs() {
+            fileTabsEl.innerHTML = fileOrder.map(key =>
+                `<div class="file-tab" id="tab-${key}" data-file="${key}"><span class="fdot"></span>${files[key].label}</div>`
+            ).join('');
+        }
+        renderTabs();
+
+        function renderAllCodeFiles() {
+            codeView.innerHTML = fileOrder.map(key => {
+                const f = files[key];
+                const linesHtml = f.lines.map((l, i) => `<div class="line" id="line-${key}-${i}"><span class="ln">${i + 1}</span>${l.html}</div>`).join('');
+                return `<div class="code-file" id="file-${key}">${linesHtml}</div>`;
+            }).join('');
+        }
+        renderAllCodeFiles();
+
+        function showFile(key, activeLines, dimLines) {
+            fileOrder.forEach(k => {
+                document.getElementById(`file-${k}`).classList.toggle('active', k === key);
+                document.getElementById(`tab-${k}`).classList.toggle('active', k === key);
+            });
+            // clear all line highlights in this file
+            document.querySelectorAll(`#file-${key} .line`).forEach(el => el.classList.remove('active', 'faded'));
+            (dimLines || []).forEach(i => { const el = document.getElementById(`line-${key}-${i}`); if (el) el.classList.add('faded'); });
+            (activeLines || []).forEach(i => { const el = document.getElementById(`line-${key}-${i}`); if (el) el.classList.add('active'); });
+        }
+
+        function flashTab(key) {
+            const tab = document.getElementById(`tab-${key}`);
+            tab.classList.remove('flash');
+            void tab.offsetWidth; // restart animation
+            tab.classList.add('flash');
+        }
+
+        document.getElementById('codeBlocks').innerHTML = codeSegBlocks;
+
+        /* =========================================================
+           STEPPER
+        ========================================================= */
+        const stepperEl = document.getElementById('stepper');
+        function renderStepper() {
+            stepperEl.innerHTML = '<div class="progress" id="stepperProgress"></div>' +
+                STEP_LABELS.map((label, i) => `<div class="step" id="step-${i}"><div class="step-node">${i + 1}</div><div class="step-label">${label}</div></div>`).join('');
+        }
+        renderStepper();
+
+        function updateStepper(nodeIdx) {
+            const accent = activeScenario === 'bkash' ? 'var(--pointer)' : 'var(--value)';
+            document.querySelectorAll('.step').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                el.querySelector('.step-node').style.borderColor = '';
+                el.querySelector('.step-node').style.background = '';
+                el.querySelector('.step-node').style.color = '';
+                if (i < nodeIdx) {
+                    el.classList.add('done');
+                    el.querySelector('.step-node').style.borderColor = accent;
+                    el.querySelector('.step-node').style.color = accent;
+                }
+                if (i === nodeIdx) {
+                    el.classList.add('active');
+                    el.querySelector('.step-node').style.borderColor = accent;
+                    el.querySelector('.step-node').style.background = accent;
+                    el.querySelector('.step-node').style.color = '#0a0e14';
+                }
+            });
+            const pct = nodeIdx < 0 ? 0 : (nodeIdx / (STEP_LABELS.length - 1)) * 100;
+            const bar = document.getElementById('stepperProgress');
+            bar.style.width = pct + '%';
+            bar.style.background = accent;
+        }
+
+        /* =========================================================
+           BLOCK RENDERING
+        ========================================================= */
+        function rowHTML(row, prevVal) {
+            const valClass = row.isNil ? 'nil' : (row.isPtr ? 'ptr' : '');
+            const pulse = (prevVal !== undefined && prevVal !== row.v) ? ' pulse' : '';
+            return `<div class="row"><span class="k">${row.k} =</span> <span class="v ${valClass}${pulse}">${row.v}</span></div>`;
+        }
+
+        function frameHTML(frame, prevRowsMap) {
+            const prevRows = prevRowsMap ? prevRowsMap[frame.id] : null;
+            const rowsHtml = frame.rows.map((r, idx) => {
+                const prevVal = prevRows && prevRows[idx] ? prevRows[idx].v : undefined;
+                return rowHTML(r, prevVal);
+            }).join('');
+            const tagType = activeScenario === 'bkash' ? 'ptr-tag' : 'val-tag';
+            const badge = frame.badge ? `<span class="tag ${tagType}">${frame.badge}</span>` : '';
+            return `<div class="mem-block ${frame.cls}" id="blk-${frame.id}">
+    <div class="blk-title">${frame.title} ${badge}</div>
+    ${rowsHtml}
+  </div>`;
+        }
+
+        function heapHTML(block, prevRowsMap) {
+            const prevRows = prevRowsMap ? prevRowsMap[block.id] : null;
+            const rowsHtml = block.rows.map((r, idx) => {
+                const prevVal = prevRows && prevRows[idx] ? prevRows[idx].v : undefined;
+                return rowHTML(r, prevVal);
+            }).join('');
+            return `<div class="mem-block ${block.cls}" id="blk-${block.id}">
+    <div class="blk-title">${block.title} <span class="blk-addr">${block.addr}</span></div>
+    ${rowsHtml}
+  </div>`;
+        }
+
+        function snapshotRows(items) {
+            const map = {};
+            items.forEach(it => map[it.id] = it.rows);
+            return map;
+        }
+
+        /* =========================================================
+           ARROW OVERLAY
+        ========================================================= */
+        const overlay = document.getElementById('arrowOverlay');
+        const ramWrap = document.querySelector('.ram-wrap');
+
+        function getAnchor(elId, side) {
+            const el = document.getElementById(elId);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const w = ramWrap.getBoundingClientRect();
+            const x = side === 'right' ? (r.right - w.left) : (r.left - w.left);
+            const y = (r.top + r.height / 2) - w.top;
+            return { x, y };
+        }
+
+        function drawArrows(specs) {
+            overlay.innerHTML = '';
+            if (!specs || !specs.length) return;
+            requestAnimationFrame(() => {
+                const w = ramWrap.getBoundingClientRect();
+                overlay.setAttribute('width', w.width);
+                overlay.setAttribute('height', w.height);
+                overlay.setAttribute('viewBox', `0 0 ${w.width} ${w.height}`);
+
+                specs.forEach((spec, i) => {
+                    const from = getAnchor(`blk-${spec.from}`, 'right');
+                    const to = getAnchor(`blk-${spec.to}`, 'left');
+                    if (!from || !to) return;
+                    const midX = (from.x + to.x) / 2;
+                    const cls = spec.style || 'solid';
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const d = `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`;
+                    path.setAttribute('d', d);
+                    path.setAttribute('pathLength', '220');
+                    path.setAttribute('class', cls);
+                    overlay.appendChild(path);
+
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', to.x);
+                    dot.setAttribute('cy', to.y);
+                    dot.setAttribute('r', 3.5);
+                    dot.setAttribute('class', cls);
+                    overlay.appendChild(dot);
+
+                    if (spec.label) {
+                        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        txt.setAttribute('x', midX);
+                        txt.setAttribute('y', (from.y + to.y) / 2 - 8);
+                        txt.setAttribute('text-anchor', 'middle');
+                        txt.setAttribute('fill', cls === 'solid' ? 'var(--pointer)' : 'var(--value)');
+                        txt.setAttribute('class', cls);
+                        txt.textContent = spec.label;
+                        overlay.appendChild(txt);
+                    }
+
+                    setTimeout(() => {
+                        path.classList.add('show');
+                        dot.classList.add('show');
+                        const t = overlay.querySelectorAll('text')[overlay.querySelectorAll('text').length ? i : -1];
+                    }, i * 130);
+                });
+
+                // separately animate text elements (collected after path/dot loop to keep indices simple)
+                overlay.querySelectorAll('text').forEach((t, i) => {
+                    setTimeout(() => t.classList.add('show'), i * 130);
+                });
+            });
+        }
+
+        /* =========================================================
+           MAIN STEP RENDER
+        ========================================================= */
+        function renderStep(data) {
+            showFile(data.file, data.activeLines, data.dimLines);
+            if (data.fileTo) {
+                setTimeout(() => {
+                    flashTab(data.fileTo);
+                    showFile(data.fileTo, data.activeLines2);
+                }, 480);
+            }
+
+            document.getElementById('phaseTag').textContent = data.phase;
+
+            document.getElementById('stackFrames').innerHTML = data.stack.map(f => frameHTML(f, prevStackRows)).join('');
+            prevStackRows = snapshotRows(data.stack);
+
+            document.getElementById('heapBlocks').innerHTML = data.heap.map(b => heapHTML(b, prevHeapRows)).join('');
+            prevHeapRows = snapshotRows(data.heap);
+
+            const consoleEl = document.getElementById('consoleMsg');
+            consoleEl.innerHTML = data.console;
+
+            updateStepper(data.node);
+            drawArrows(data.arrows);
+
+            const verdictRow = document.getElementById('verdictRow');
+            verdictRow.innerHTML = '';
+            if (data.output) {
+                const out = document.createElement('div');
+                out.className = 'console-output';
+                out.textContent = data.output;
+                verdictRow.appendChild(out);
+            }
+            if (data.verdict) {
+                const card = document.createElement('div');
+                card.className = `verdict-card ${data.verdict.type}`;
+                card.style.marginTop = '12px';
+                card.innerHTML = `<div class="vt">${data.verdict.title}</div><div class="vd">${data.verdict.detail}</div>`;
+                const wrap = document.createElement('div');
+                wrap.className = 'verdict-row';
+                wrap.appendChild(card);
+                verdictRow.appendChild(wrap);
+            }
+        }
+
+        /* =========================================================
+           CONTROLS
+        ========================================================= */
+        function nextStep() {
+            const steps = scenarios[activeScenario];
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                renderStep(steps[currentStep]);
+                if (currentStep === steps.length - 1) {
+                    document.getElementById('btnNext').disabled = true;
+                }
+            }
+        }
+
+        function resetSim() {
+            currentStep = -1;
+            prevStackRows = {};
+            prevHeapRows = {};
+            document.getElementById('stackFrames').innerHTML = '';
+            document.getElementById('heapBlocks').innerHTML = '';
+            document.getElementById('verdictRow').innerHTML = '';
+            overlay.innerHTML = '';
+            document.getElementById('phaseTag').textContent = 'idle';
+            updateStepper(-1);
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('consoleMsg').innerHTML = 'একটা scenario বেছে নিয়ে <b>Next step</b> চাপো।';
+            showFile('main', [], []);
+        }
+
+        function switchScenario(name) {
+            activeScenario = name;
+            document.querySelectorAll('.scenario-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.scenario === name);
+            });
+            resetSim();
+        }
+
+        window.addEventListener('resize', () => {
+            const steps = scenarios[activeScenario];
+            if (currentStep >= 0 && currentStep < steps.length) {
+                drawArrows(steps[currentStep].arrows);
+            }
+        });
+
+        // initial state
+        showFile('main', [], []);
+        updateStepper(-1);
+    </script>
+</body>
+
+</html>
