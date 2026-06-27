@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Defer Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e14;
+            --panel: #11161f;
+            --panel-2: #0d121a;
+            --line: #232b38;
+            --line-soft: #1a212c;
+            --text: #c7d0dc;
+            --text-dim: #6b7686;
+            --text-bright: #eef2f7;
+
+            --stack: #ff8a7a;
+            --stack-dim: #5a3934;
+            --heap: #4fd8a8;
+            --heap-dim: #2f4a3f;
+            --code: #8aa6ff;
+            --code-dim: #36406b;
+            --pointer: #ffcc66;
+            --value: #c792ea;
+
+            --kw: #ff8a7a;
+            --type: #ffb454;
+            --str: #4fd8a8;
+            --com: #5b6677;
+            --fn: #8aa6ff;
+            --num: #ffb454;
+
+            --sans: 'Space Grotesk', system-ui, sans-serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 28px 40px;
+            background:
+                radial-gradient(circle at 18% -10%, rgba(138, 166, 255, 0.08), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(255, 204, 102, 0.06), transparent 40%),
+                var(--bg);
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .masthead {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            max-width: 1480px;
+            margin: 0 auto 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line-soft);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .masthead h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-bright);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .masthead h1 .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--pointer);
+            box-shadow: 0 0 12px var(--pointer);
+        }
+
+        .masthead .sub {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+
+        .topic-tabs {
+            display: flex;
+            gap: 8px;
+            max-width: 1480px;
+            margin: 0 auto 18px;
+            flex-wrap: wrap;
+        }
+
+        .topic-tab {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--panel-2);
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            padding: 9px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all .2s ease;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .topic-tab .tdot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .topic-tab.active {
+            color: var(--text-bright);
+            border-color: #3a4555;
+            background: #161d27;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 0.92fr 1.5fr;
+            gap: 18px;
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 14px 30px -18px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        .code-panel .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .traffic {
+            display: flex;
+            gap: 6px;
+        }
+
+        .traffic span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .traffic span:nth-child(1) {
+            background: #ff5f57;
+        }
+
+        .traffic span:nth-child(2) {
+            background: #febc2e;
+        }
+
+        .traffic span:nth-child(3) {
+            background: #28c840;
+        }
+
+        .filename {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .code-container {
+            font-family: var(--mono);
+            line-height: 1.68;
+            font-size: 12.8px;
+            padding: 14px 0 18px;
+            white-space: pre;
+            overflow-x: auto;
+            min-height: 480px;
+            max-height: 620px;
+            overflow-y: auto;
+        }
+
+        .line {
+            position: relative;
+            padding: 1px 16px 1px 48px;
+            transition: background-color .25s ease, border-color .25s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .line .ln {
+            position: absolute;
+            left: 14px;
+            width: 24px;
+            text-align: right;
+            color: #3a4250;
+            font-size: 11px;
+            user-select: none;
+        }
+
+        .line.active {
+            background: linear-gradient(90deg, rgba(255, 204, 102, 0.16), rgba(255, 204, 102, 0.03) 70%);
+            border-left-color: var(--pointer);
+        }
+
+        .line.faded {
+            opacity: 0.4;
+        }
+
+        .line.defer-exec {
+            background: linear-gradient(90deg, rgba(79, 216, 168, 0.16), rgba(79, 216, 168, 0.03) 70%);
+            border-left-color: var(--heap);
+        }
+
+        .kw {
+            color: var(--kw);
+            font-weight: 600;
+        }
+
+        .type {
+            color: var(--type);
+        }
+
+        .com {
+            color: var(--com);
+            font-style: italic;
+        }
+
+        .fn {
+            color: var(--fn);
+        }
+
+        .str {
+            color: var(--str);
+        }
+
+        .num {
+            color: var(--num);
+        }
+
+        .vis-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--line-soft);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .vis-head .label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .vis-head .phase {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.08);
+            border: 1px solid rgba(255, 204, 102, 0.25);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .vis-wrap {
+            position: relative;
+            padding: 20px;
+            min-height: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .vis-zone {
+            border-radius: 8px;
+            padding: 14px;
+            background: var(--panel-2);
+            border: 1.5px solid var(--line);
+        }
+
+        .vis-zone-title {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            text-transform: uppercase;
+        }
+
+        .vis-zone-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: currentColor;
+            opacity: 0.2;
+        }
+
+        /* ---------- return value tracker ---------- */
+        .retval-display {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .retval-box {
+            font-family: var(--mono);
+            border-radius: 10px;
+            padding: 16px 24px;
+            background: #161d27;
+            border: 2px solid var(--line);
+            text-align: center;
+            min-width: 120px;
+            transition: all .35s cubic-bezier(.25, 1, .5, 1);
+        }
+
+        .retval-box .rv-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+
+        .retval-box .rv-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-bright);
+        }
+
+        .retval-box.changed {
+            border-color: var(--pointer);
+            background: rgba(255, 204, 102, 0.1);
+            animation: rvPulse .55s ease;
+        }
+
+        @keyframes rvPulse {
+            0% {
+                transform: scale(1.12);
+                box-shadow: 0 0 20px rgba(255, 204, 102, 0.5);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: none;
+            }
+        }
+
+        .retval-box.zero {
+            border-style: dashed;
+            opacity: 0.6;
+        }
+
+        .retval-box.final {
+            border-color: var(--heap);
+            background: rgba(79, 216, 168, 0.08);
+        }
+
+        .retval-arrow {
+            font-size: 20px;
+            color: var(--text-dim);
+        }
+
+        .var-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .var-chip {
+            font-family: var(--mono);
+            border-radius: 8px;
+            padding: 8px 14px;
+            background: #161d27;
+            border: 1.5px solid var(--line);
+            text-align: center;
+            min-width: 90px;
+            transition: all .3s ease;
+        }
+
+        .var-chip .vc-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 3px;
+        }
+
+        .var-chip .vc-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-bright);
+        }
+
+        .var-chip.changed {
+            border-color: var(--code);
+            animation: rvPulse .5s ease;
+        }
+
+        /* ---------- defer stack (LIFO) ---------- */
+        .defer-stack {
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 8px;
+            min-height: 56px;
+        }
+
+        .defer-item {
+            font-family: var(--mono);
+            font-size: 12px;
+            border-radius: 7px;
+            padding: 9px 13px;
+            background: #161d27;
+            border-left: 3px solid var(--pointer);
+            border: 1px solid var(--line);
+            border-left-width: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: pushIn .35s cubic-bezier(.25, 1, .5, 1);
+            opacity: 1;
+            gap: 10px;
+        }
+
+        @keyframes pushIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .defer-item .di-label {
+            color: var(--text-bright);
+        }
+
+        .defer-item .di-order {
+            font-size: 10px;
+            color: var(--pointer);
+            background: rgba(255, 204, 102, 0.1);
+            border: 1px solid rgba(255, 204, 102, 0.3);
+            padding: 1px 7px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+
+        .defer-item.popped {
+            opacity: 0.3;
+            border-left-color: var(--heap);
+            animation: popFlash .5s ease;
+        }
+
+        .defer-item.popped .di-order {
+            color: var(--heap);
+            background: rgba(79, 216, 168, 0.08);
+            border-color: rgba(79, 216, 168, 0.3);
+        }
+
+        @keyframes popFlash {
+            0% {
+                background: rgba(79, 216, 168, 0.18);
+                transform: translateX(6px);
+            }
+
+            100% {
+                background: #161d27;
+                transform: translateX(0);
+            }
+        }
+
+        .defer-empty {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-dim);
+            font-style: italic;
+            padding: 8px 0;
+        }
+
+        .stack-direction {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: 9.5px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            letter-spacing: 0.05em;
+        }
+
+        .info-strip {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-dim);
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            margin-top: 8px;
+        }
+
+        /* ---------- bottom panel ---------- */
+        .bottom-panel {
+            grid-column: 1 / -1;
+            padding: 20px 22px;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            position: relative;
+            margin-bottom: 22px;
+            padding: 0 6px;
+            overflow-x: auto;
+        }
+
+        .step-track {
+            position: relative;
+            flex: 1;
+            min-width: 560px;
+        }
+
+        .step-track::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background: var(--line);
+            z-index: 1;
+        }
+
+        .step-track .progress {
+            position: absolute;
+            top: 14px;
+            left: 30px;
+            height: 2px;
+            background: var(--pointer);
+            z-index: 2;
+            transition: width .35s cubic-bezier(.25, 1, .5, 1);
+            width: 0%;
+        }
+
+        .step-track-inner {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 3;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-width: 60px;
+        }
+
+        .step-node {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            border: 2px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--text-dim);
+            transition: all .3s ease;
+        }
+
+        .step.active .step-node {
+            border-color: var(--pointer);
+            background: var(--pointer);
+            color: #0a0e14;
+            box-shadow: 0 0 12px rgba(255, 204, 102, 0.55);
+        }
+
+        .step.done .step-node {
+            border-color: var(--code-dim);
+            color: var(--pointer);
+            background: transparent;
+        }
+
+        .step .step-label {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-align: center;
+            max-width: 70px;
+        }
+
+        .step.active .step-label {
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 13.5px;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #3a4555;
+            background: #161d27;
+            transform: translateY(-1px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #btnNext {
+            background: linear-gradient(135deg, #ffb454, #ffcc66);
+            color: #1a1408;
+            border-color: transparent;
+        }
+
+        #btnNext:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        .console-box {
+            background: #05070a;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--pointer);
+            padding: 14px 16px;
+            border-radius: 7px;
+            font-size: 13.5px;
+            line-height: 1.65;
+            min-height: 54px;
+            transition: border-left-color .3s ease;
+        }
+
+        .console-box .hl {
+            color: var(--pointer);
+            font-weight: 700;
+        }
+
+        .console-box .hl-heap {
+            color: var(--heap);
+            font-weight: 700;
+        }
+
+        .console-box .hl-stack {
+            color: var(--stack);
+            font-weight: 700;
+        }
+
+        .console-box .hl-code {
+            color: var(--fn);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .console-box .hl-val {
+            color: var(--value);
+            font-weight: 700;
+        }
+
+        .output-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .output-chip {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: rgba(79, 216, 168, 0.08);
+            border: 1px solid rgba(79, 216, 168, 0.3);
+            color: var(--heap);
+            padding: 5px 10px;
+            border-radius: 6px;
+            opacity: 0;
+            animation: chipIn .35s ease forwards;
+            align-self: flex-start;
+        }
+
+        @keyframes chipIn {
+            from {
+                opacity: 0;
+                transform: scale(0.85);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .takeaway-card {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12.5px;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--pointer);
+            background: var(--panel-2);
+            opacity: 0;
+            animation: chipIn .4s ease forwards;
+        }
+
+        .takeaway-card .tt {
+            font-weight: 700;
+            font-size: 11.5px;
+            color: var(--pointer);
+            margin-bottom: 4px;
+        }
+
+        .takeaway-card .td {
+            color: var(--text-dim);
+        }
+
+        @media (max-width: 980px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .step .step-label {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="masthead">
+        <h1><span class="dot"></span>Go Defer — Execution Order &amp; Return Value Visualizer</h1>
+        <div class="sub">LIFO stack · closures · named returns</div>
+    </div>
+
+    <div class="topic-tabs" id="topicTabs"></div>
+
+    <div class="container">
+        <div class="panel code-panel">
+            <div class="panel-head">
+                <div class="traffic"><span></span><span></span><span></span></div>
+                <div class="filename" id="filenameTag">defer_demo.go</div>
+            </div>
+            <div class="code-container" id="codeView"></div>
+        </div>
+
+        <div class="panel vis-panel">
+            <div class="vis-head">
+                <div class="label" id="visLabel">Execution</div>
+                <div class="phase" id="phaseTag">idle</div>
+            </div>
+            <div class="vis-wrap" id="visWrap"></div>
+        </div>
+
+        <div class="panel bottom-panel">
+            <div class="stepper">
+                <div class="step-track" id="stepTrack">
+                    <div class="progress" id="stepperProgress"></div>
+                    <div class="step-track-inner" id="stepTrackInner"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="btnNext" onclick="nextStep()">Next step ▶</button>
+                <button id="btnReset" onclick="resetSim()">↺ Reset</button>
+            </div>
+
+            <div class="console-box" id="consoleMsg">একটা version বেছে নিয়ে <b>Next step</b> চাপো।</div>
+            <div id="extraRow"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           ACCENTS
+        ========================================================================= */
+        const ACCENTS = { v1: 'var(--stack)', v2: 'var(--code)', v21: 'var(--value)', v3: 'var(--pointer)', real: 'var(--heap)' };
+
+        /* =========================================================================
+           VERSION 1.0 — argument evaluated at defer-registration time (snapshot)
+        ========================================================================= */
+        const v1Code = [
+            { html: '<span class="kw">func</span> deferred(result <span class="type">int</span>) {' },
+            { html: '    fmt.Println(<span class="str">"deferred result :"</span>, result)' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> example() <span class="type">int</span> {' },
+            { html: '    result := <span class="num">10</span>' },
+            { html: '' },
+            { html: '    <span class="kw">defer</span> deferred(result) <span class="com">// snapshot taken NOW: 10</span>' },
+            { html: '' },
+            { html: '    result = <span class="num">20</span>' },
+            { html: '' },
+            { html: '    fmt.Println(<span class="str">"Inside example:"</span>, result)' },
+            { html: '    <span class="kw">return</span> result' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    example()' },
+            { html: '}' },
+        ];
+        function v1Steps() {
+            return [
+                {
+                    node: 0, phase: 'result = 10', activeLines: [5],
+                    console: `<span class="hl">result := 10</span> — একটা সাধারণ লোকাল ভ্যারিয়েবল declare হলো।`,
+                    render: vw => renderV1(vw, { result: 10 }, null, false, 10)
+                },
+                {
+                    node: 1, phase: 'defer registered — ARG SNAPSHOT', activeLines: [7],
+                    console: `<span class="hl">defer deferred(result)</span> — এখানেই সবচেয়ে গুরুত্বপূর্ণ ব্যাপারটা ঘটে: <span class="hl-stack">argument-টা এই মুহূর্তেই evaluate হয়ে যায়</span> এবং একটা <span class="hl-stack">snapshot (10)</span> defer queue-তে জমা হয়ে যায়। পরে result বদলালেও এই snapshot বদলাবে না।`,
+                    render: vw => renderV1(vw, { result: 10 }, 10, false, 10)
+                },
+                {
+                    node: 2, phase: 'result = 20', activeLines: [9],
+                    console: `<span class="hl">result = 20</span> — লোকাল ভ্যারিয়েবল বদলে গেলো, কিন্তু defer-এ জমা থাকা snapshot (<span class="hl-stack">10</span>) অপরিবর্তিত — কারণ সেটা আগেই কপি হয়ে গেছে।`,
+                    render: vw => renderV1(vw, { result: 20 }, 10, false, 20)
+                },
+                {
+                    node: 3, phase: 'before return', activeLines: [11, 12],
+                    console: `<span class="hl">"Inside example:", result</span> প্রিন্ট হবে <span class="hl">20</span> — কারণ এটা সরাসরি current variable পড়ছে।`,
+                    render: vw => renderV1(vw, { result: 20 }, 10, false, 20),
+                    output: 'Inside example: 20'
+                },
+                {
+                    node: 4, phase: 'function returns, defer fires', activeLines: [12],
+                    console: `<span class="hl">return result</span> এর পর function exit করছে — এখন queue-তে জমা থাকা <span class="hl-stack">deferred(10)</span> কল execute হবে, তার ভেতরের <span class="hl">result</span> parameter-টা সেই পুরোনো <span class="hl-stack">snapshot (10)</span>।`,
+                    render: vw => renderV1(vw, { result: 20 }, 10, true, 20),
+                    output: 'deferred result : 10',
+                    takeaway: { title: 'v1.0 টেকঅ্যাওয়ে', detail: 'defer foo(arg) — arg এখনই (registration time) evaluate হয় এবং স্ন্যাপশট হিসেবে জমা থাকে, function execute হওয়ার সময় না।' }
+                }
+            ];
+        }
+        function renderV1(vw, vars, snapshot, fired, currentResult) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">live variable</div>
+      <div class="var-row">
+        <div class="var-chip"><div class="vc-label">result</div><div class="vc-value">${vars.result}</div></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">defer queue (argument snapshot taken at registration)</div>
+      <div class="defer-stack">
+        ${snapshot === null ? '<div class="defer-empty">(no defer registered yet)</div>' :
+                    `<div class="defer-item ${fired ? 'popped' : ''}">
+            <span class="di-label">deferred(<span style="color:var(--stack)">${snapshot}</span>) <span style="color:var(--text-dim)">// frozen at defer-time</span></span>
+            <span class="di-order">${fired ? 'fired ✓' : 'waiting'}</span>
+          </div>`}
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">return value</div>
+      <div class="retval-display">
+        <div class="retval-box ${fired ? 'final' : ''}">
+          <div class="rv-label">example() returns</div>
+          <div class="rv-value">${currentResult}</div>
+        </div>
+      </div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           VERSION 2.0 — closure defer, reads variable at execution time (by reference)
+        ========================================================================= */
+        const v2Code = [
+            { html: '<span class="kw">func</span> example() <span class="type">int</span> {' },
+            { html: '    result := <span class="num">10</span>' },
+            { html: '' },
+            { html: '    <span class="kw">defer</span> <span class="kw">func</span>() {' },
+            { html: '        fmt.Println(<span class="str">"deferred result :"</span>, result) <span class="com">// reads LIVE result</span>' },
+            { html: '    }()' },
+            { html: '' },
+            { html: '    fmt.Println(<span class="str">"Inside example:"</span>, result)' },
+            { html: '' },
+            { html: '    result = result + <span class="num">50</span>' },
+            { html: '    <span class="kw">return</span> result' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    fmt.Println(<span class="str">"Return result:"</span>, example())' },
+            { html: '}' },
+        ];
+        function v2Steps() {
+            return [
+                {
+                    node: 0, phase: 'result = 10', activeLines: [1],
+                    console: `<span class="hl">result := 10</span>।`,
+                    render: vw => renderV2(vw, 10, false, false, null)
+                },
+                {
+                    node: 1, phase: 'closure defer registered', activeLines: [3, 4, 5],
+                    console: `<span class="hl-code">defer func(){...}()</span> — এবার argument নেই, পুরো একটা <span class="hl-code">closure</span> defer হচ্ছে। এই closure ভেতরের <span class="hl">result</span>-কে <span class="hl-code">reference/capture</span> করে রাখে — কোনো snapshot নেওয়া হয় না। তাই এটা পরে execute হওয়ার সময় <span class="hl-code">তখনকার</span> মান পড়বে।`,
+                    render: vw => renderV2(vw, 10, true, false, null)
+                },
+                {
+                    node: 2, phase: 'before mutation', activeLines: [7],
+                    console: `<span class="hl">"Inside example:", result</span> → প্রিন্ট হবে <span class="hl">10</span>।`,
+                    render: vw => renderV2(vw, 10, true, false, null),
+                    output: 'Inside example: 10'
+                },
+                {
+                    node: 3, phase: 'result = 60', activeLines: [9],
+                    console: `<span class="hl">result = result + 50</span> → result এখন <span class="hl-code">60</span>। closure এই একই ভ্যারিয়েবল capture করে রেখেছে, তাই এই বদল closure-এর জন্যও "visible"।`,
+                    render: vw => renderV2(vw, 60, true, false, null)
+                },
+                {
+                    node: 4, phase: 'return + defer fires', activeLines: [10],
+                    console: `<span class="hl">return result</span> → return value <span class="hl">60</span> এ সেট হলো। এরপর deferred closure execute হয় — এটা এখন capture করা <span class="hl-code">result</span> পড়ে, যার মান এখন <span class="hl-code">60</span>। তাই snapshot (v1.0) আর reference (v2.0) এর পার্থক্য এখানেই স্পষ্ট।`,
+                    render: vw => renderV2(vw, 60, true, true, 60),
+                    output: 'deferred result : 60',
+                    takeaway: { title: 'v2.0 টেকঅ্যাওয়ে', detail: 'defer func(){...}() — closure ভ্যারিয়েবল reference করে রাখে, snapshot না। Execute হওয়ার সময় current/live মান দেখে।' }
+                },
+                {
+                    node: 5, phase: 'main receives return', activeLines: [13, 14],
+                    console: `<span class="hl-code">main()</span>-এ <span class="hl">example()</span>-এর return value হিসেবে <span class="hl">60</span> পাওয়া যাবে — defer ফায়ার হওয়ার আগেই return value চূড়ান্ত হয়ে গিয়েছিল (এই version-এ named return নেই, তাই defer সেটা বদলাতে পারে না)।`,
+                    render: vw => renderV2(vw, 60, true, true, 60),
+                    output: 'Return result: 60'
+                }
+            ];
+        }
+        function renderV2(vw, resultVal, deferred, fired, retval) {
+            return vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">live variable (captured by closure)</div>
+      <div class="var-row">
+        <div class="var-chip ${fired ? 'changed' : ''}"><div class="vc-label">result</div><div class="vc-value">${resultVal}</div></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">defer queue (closure captures variable by reference)</div>
+      <div class="defer-stack">
+        ${!deferred ? '<div class="defer-empty">(no defer registered yet)</div>' :
+                    `<div class="defer-item ${fired ? 'popped' : ''}">
+            <span class="di-label">func(){ println(result) } <span style="color:var(--text-dim)">// reads live result</span></span>
+            <span class="di-order">${fired ? 'fired ✓' : 'waiting'}</span>
+          </div>`}
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">return value</div>
+      <div class="retval-display">
+        <div class="retval-box ${retval !== null ? 'final' : 'zero'}">
+          <div class="rv-label">example() returns</div>
+          <div class="rv-value">${retval !== null ? retval : '—'}</div>
+        </div>
+      </div>
+      <div class="info-strip">unnamed return — return value তখনই copy হয়ে যায় return statement-এ, defer পরে চাইলেও সেটা বদলাতে পারে না</div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           VERSION 2.1 — defer mutates the local var AFTER return value already copied out
+        ========================================================================= */
+        const v21Code = [
+            { html: '<span class="kw">func</span> example() <span class="type">int</span> {' },
+            { html: '    result := <span class="num">10</span>' },
+            { html: '' },
+            { html: '    <span class="kw">defer</span> <span class="kw">func</span>() {' },
+            { html: '        result = result + <span class="num">200</span> <span class="com">// 310 — modifies local, NOT return value</span>' },
+            { html: '        fmt.Println(<span class="str">"deferred result :"</span>, result)' },
+            { html: '    }()' },
+            { html: '' },
+            { html: '    fmt.Println(<span class="str">"Inside example:"</span>, result)' },
+            { html: '' },
+            { html: '    result = result + <span class="num">100</span> <span class="com">// 110</span>' },
+            { html: '    <span class="kw">return</span> result <span class="com">// return value COPIED here: 110</span>' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    fmt.Println(<span class="str">"Return result:"</span>, example())' },
+            { html: '}' },
+        ];
+        function v21Steps() {
+            return [
+                {
+                    node: 0, phase: 'result = 10', activeLines: [1],
+                    console: `<span class="hl">result := 10</span>।`,
+                    render: vw => renderV21(vw, 10, null, false, false, null)
+                },
+                {
+                    node: 1, phase: 'closure defer registered', activeLines: [3, 4, 5, 6],
+                    console: `<span class="hl-val">defer func(){...}()</span> — এই closure ভেতরে <span class="hl">result = result + 200</span> লিখেছে। মনে রাখো, এই closure <span class="hl">result</span> ভ্যারিয়েবলকেই modify করবে, কিন্তু এই function-এ <span class="hl-stack">named return value নেই</span> — তাই এই modification আদৌ return value-কে প্রভাবিত করবে কিনা সেটাই দেখার বিষয়।`,
+                    render: vw => renderV21(vw, 10, null, true, false, null)
+                },
+                {
+                    node: 2, phase: 'before mutation', activeLines: [8],
+                    console: `<span class="hl">"Inside example:", result</span> → <span class="hl">10</span>।`,
+                    render: vw => renderV21(vw, 10, null, true, false, null),
+                    output: 'Inside example: 10'
+                },
+                {
+                    node: 3, phase: 'result = 110', activeLines: [10],
+                    console: `<span class="hl">result = result + 100</span> → result এখন <span class="hl">110</span>।`,
+                    render: vw => renderV21(vw, 110, null, true, false, null)
+                },
+                {
+                    node: 4, phase: 'return COPIES value out — 110 frozen', activeLines: [11],
+                    console: `<span class="hl">return result</span> — এই মুহূর্তে return value <span class="hl-stack">110</span> হিসেবে <span class="hl-stack">কপি হয়ে বেরিয়ে যায়</span> এবং caller-এর জন্য "frozen"। এখনো defer ফায়ার হয়নি!`,
+                    render: vw => renderV21(vw, 110, 110, true, false, null)
+                },
+                {
+                    node: 5, phase: 'defer fires AFTER the copy', activeLines: [4, 5],
+                    console: `এখন defer ফায়ার হলো: <span class="hl">result = result + 200</span> → local <span class="hl">result</span> ভ্যারিয়েবল বদলে <span class="hl-val">310</span> হয়ে গেলো। কিন্তু return value আগেই <span class="hl-stack">110</span>-এ frozen হয়ে গেছে — তাই এই বদল return value-তে কোনো প্রভাব ফেলে না!`,
+                    render: vw => renderV21(vw, 310, 110, true, true, 110),
+                    output: 'deferred result : 310'
+                },
+                {
+                    node: 6, phase: 'main receives the frozen 110', activeLines: [14, 15],
+                    console: `<span class="hl-code">main()</span>-এ <span class="hl">example()</span> এখনো <span class="hl-stack">110</span> রিটার্ন করে — defer যত পরেই local variable বদলাক, unnamed return-এ সেই বদল return value-কে আর ছুঁতে পারে না। এটাই v3.0-এর সাথে মূল পার্থক্য।`,
+                    render: vw => renderV21(vw, 310, 110, true, true, 110),
+                    output: 'Return result: 110',
+                    takeaway: { title: 'v2.1 টেকঅ্যাওয়ে', detail: 'Unnamed return-এ "return result" এক্সিকিউট হওয়া মাত্র ভ্যালু কপি হয়ে বেরিয়ে যায়। তারপর defer যা-ই করুক, সেই কপি করা return value আর বদলায় না।' }
+                }
+            ];
+        }
+        function renderV21(vw, resultVal, frozenRet, deferred, fired, displayedRet) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">live variable</div>
+      <div class="var-row">
+        <div class="var-chip ${fired ? 'changed' : ''}"><div class="vc-label">result (local)</div><div class="vc-value">${resultVal}</div></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">defer queue</div>
+      <div class="defer-stack">
+        ${!deferred ? '<div class="defer-empty">(no defer registered yet)</div>' :
+                    `<div class="defer-item ${fired ? 'popped' : ''}">
+            <span class="di-label">func(){ result += 200 } <span style="color:var(--text-dim)">// mutates local only</span></span>
+            <span class="di-order">${fired ? 'fired ✓' : 'waiting'}</span>
+          </div>`}
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">return value — copied at "return", then frozen</div>
+      <div class="retval-display">
+        <div class="retval-box ${frozenRet !== null ? 'final' : 'zero'}">
+          <div class="rv-label">example() returns</div>
+          <div class="rv-value">${displayedRet !== null ? displayedRet : (frozenRet !== null ? frozenRet : '—')}</div>
+        </div>
+        ${frozenRet !== null ? '<span class="retval-arrow">🔒</span><span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">frozen — defer cannot reach this anymore</span>' : ''}
+      </div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           VERSION 3.0 — named return values + multi-defer LIFO
+        ========================================================================= */
+        const v3Code = [
+            { html: '<span class="kw">func</span> example() (result <span class="type">int</span>) { <span class="com">// named return, zero value 0</span>' },
+            { html: '    result = <span class="num">10</span> <span class="com">// reassign</span>' },
+            { html: '' },
+            { html: '    <span class="kw">defer</span> <span class="kw">func</span>() {' },
+            { html: '        result = result + <span class="num">200</span> <span class="com">// 310 — modifies the ACTUAL return value!</span>' },
+            { html: '        fmt.Println(<span class="str">"deferred result :"</span>, result)' },
+            { html: '    }()' },
+            { html: '' },
+            { html: '    <span class="com">// follow LIFO</span>' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="num">1</span>)' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="num">2</span>)' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="num">2</span>)' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="num">4</span>)' },
+            { html: '' },
+            { html: '    fmt.Println(<span class="str">"Inside example:"</span>, result)' },
+            { html: '' },
+            { html: '    result = result + <span class="num">100</span> <span class="com">// 110</span>' },
+            { html: '    <span class="kw">return</span> <span class="com">// naked return — result is already 110</span>' },
+            { html: '}' },
+            { html: '' },
+            { html: '<span class="kw">func</span> main() {' },
+            { html: '    fmt.Println(<span class="str">"Return result:"</span>, example())' },
+            { html: '}' },
+        ];
+        function v3Steps() {
+            const steps = [];
+            steps.push({
+                node: 0, phase: 'named return = zero value', activeLines: [0],
+                console: `<span class="hl">func example() (result int)</span> — <span class="hl">result</span> এখানে একটা <span class="hl">named return value</span>। এটা function শুরু হওয়ার সাথেই zero value <span class="hl">0</span> নিয়ে declare হয়ে যায় — অনেকটা একটা pre-declared ভ্যারিয়েবলের মতো, যা গোটা function body-তে সরাসরি accessible।`,
+                render: vw => renderV3(vw, { result: 0 }, [], false, null)
+            });
+            steps.push({
+                node: 1, phase: 'result = 10', activeLines: [1],
+                console: `<span class="hl">result = 10</span> — সরাসরি named return value-টাকেই reassign করা হলো।`,
+                render: vw => renderV3(vw, { result: 10 }, [], false, null)
+            });
+            steps.push({
+                node: 2, phase: 'closure defer registered (queue: 1)', activeLines: [3, 4, 5, 6],
+                console: `<span class="hl">defer func(){ result += 200; ... }()</span> registered হলো। এটাই key insight: named return থাকায় এই closure সরাসরি আসল <span class="hl">result</span>-কেই capture করেছে — function return করার পরেও এই closure তা বদলাতে পারবে!`,
+                render: vw => renderV3(vw, { result: 10 }, [{ label: 'func(){ result += 200 }' }], false, null)
+            });
+            const printDefers = [1, 2, 2, 4];
+            printDefers.forEach((n, i) => {
+                steps.push({
+                    node: 3 + i, phase: `defer fmt.Println(${n}) registered`, activeLines: [9 + i],
+                    console: `<span class="hl">defer fmt.Println(${n})</span> — queue-তে আরেকটা যুক্ত হলো। মোট ${i + 2}টা defer registered, <span class="hl-stack">LIFO</span> অর্ডারে — পরে registered হওয়া আগে fire হবে।`,
+                    render: vw => renderV3(vw, { result: 10 }, [
+                        { label: 'func(){ result += 200 }' },
+                        ...printDefers.slice(0, i + 1).map(v => ({ label: `fmt.Println(${v})` }))
+                    ], false, null)
+                });
+            });
+            steps.push({
+                node: 7, phase: 'before mutation', activeLines: [14],
+                console: `<span class="hl">"Inside example:", result</span> → <span class="hl">10</span> প্রিন্ট হবে।`,
+                render: vw => renderV3(vw, { result: 10 }, [
+                    { label: 'func(){ result += 200 }' }, { label: 'fmt.Println(1)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(4)' }
+                ], false, null),
+                output: 'Inside example: 10'
+            });
+            steps.push({
+                node: 8, phase: 'result = 110', activeLines: [16],
+                console: `<span class="hl">result = result + 100</span> → result এখন <span class="hl">110</span>।`,
+                render: vw => renderV3(vw, { result: 110 }, [
+                    { label: 'func(){ result += 200 }' }, { label: 'fmt.Println(1)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(4)' }
+                ], false, null)
+            });
+            steps.push({
+                node: 9, phase: 'naked return — result already 110', activeLines: [17],
+                console: `<span class="hl">return</span> (কোনো ভ্যালু ছাড়া, "naked return") — যেহেতু named return value আগে থেকেই <span class="hl">110</span>, এখানে কিছু নতুন কপি হওয়ার নেই। Function এখন exit করার পথে, defer queue popping শুরু হবে।`,
+                render: vw => renderV3(vw, { result: 110 }, [
+                    { label: 'func(){ result += 200 }' }, { label: 'fmt.Println(1)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(4)' }
+                ], false, 110)
+            });
+            // pop order LIFO: 4, 2, 2, 1, then the closure last? Actually order of defers registered:
+            // 1: closure, 2: println(1), 3: println(2), 4: println(2), 5: println(4)
+            // LIFO pop order: println(4), println(2), println(2), println(1), closure
+            const popOrder = [
+                { label: 'fmt.Println(4)', out: '4' },
+                { label: 'fmt.Println(2)', out: '2' },
+                { label: 'fmt.Println(2)', out: '2' },
+                { label: 'fmt.Println(1)', out: '1' },
+                { label: 'func(){ result += 200 }', out: 'deferred result : 310', mutates: true }
+            ];
+            let stackState = [
+                { label: 'func(){ result += 200 }' }, { label: 'fmt.Println(1)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(2)' }, { label: 'fmt.Println(4)' }
+            ];
+            popOrder.forEach((item, i) => {
+                const poppedCount = i + 1;
+                const resultAfter = item.mutates ? 310 : 110;
+                steps.push({
+                    node: 10 + i, phase: `LIFO pop: ${item.label.includes('Println') ? item.label : 'closure (last in, first... wait — last registered fires first, this is last)'}`, activeLines: item.mutates ? [4, 5] : [9 + popOrder.findIndex((p, idx) => idx === i)],
+                    console: item.mutates
+                        ? `সব <span class="hl">fmt.Println</span> defer ফায়ার হয়ে গেছে। সবার আগে (LIFO-তে সবার নিচে, কারণ এটাই প্রথম registered) registered হওয়া closure ফায়ার হলো: <span class="hl">result = result + 200</span> → named return value সরাসরি <span class="hl-val">310</span> হয়ে গেলো — এটাই আসল return value, কারণ <span class="hl-stack">named return + defer</span> combo দিয়ে এটা বদলানো সম্ভব!`
+                        : `LIFO অনুযায়ী pop: <span class="hl-stack">${item.label}</span> ফায়ার হলো, prints <span class="hl">${item.out}</span>। সবচেয়ে পরে registered হওয়া defer-টাই সবার আগে চলে।`,
+                    render: vw => renderV3(vw, { result: resultAfter }, stackState.slice(0, stackState.length - poppedCount), true, resultAfter, poppedCount),
+                    output: item.mutates ? item.out : item.out
+                });
+            });
+            steps.push({
+                node: 15, phase: 'main receives the mutated 310', activeLines: [20, 21],
+                console: `<span class="hl-code">main()</span>-এ <span class="hl">example()</span> এখন রিটার্ন করে <span class="hl-val">310</span>, <span class="hl">110</span> না! কারণ <span class="hl-stack">named return value</span> defer-এর ভেতর থেকে directly mutate করা গেছে, এবং সেই mutation function-টা সত্যিই exit করার আগেই প্রভাব ফেলেছে।`,
+                render: vw => renderV3(vw, { result: 310 }, [], true, 310, 5),
+                output: 'Return result: 310',
+                takeaway: { title: 'v3.0 — সবচেয়ে গুরুত্বপূর্ণ টেকঅ্যাওয়ে', detail: 'Named return value + defer = defer সরাসরি প্রকৃত return value মডিফাই করতে পারে, এমনকি "return" statement এক্সিকিউট হওয়ার পরেও। Multiple defer সবসময় LIFO (Last In, First Out) অর্ডারে fire করে।' }
+            });
+            return steps;
+        }
+        function renderV3(vw, vars, stack, fired, retval, poppedCount) {
+            const orderTotal = stack.length + (poppedCount || 0);
+            return vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">named return value (acts like a pre-declared variable)</div>
+      <div class="var-row">
+        <div class="var-chip ${fired ? 'changed' : ''}"><div class="vc-label">result</div><div class="vc-value">${vars.result}</div></div>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">defer stack — LIFO (last registered, first fired)</div>
+      <div class="defer-stack">
+        ${stack.length === 0 && (!poppedCount) ? '<div class="defer-empty">(no defer registered yet)</div>' :
+                    stack.map((d, i) => `<div class="defer-item"><span class="di-label">${d.label}</span><span class="di-order">#${stack.length - i}</span></div>`).join('')
+                }
+      </div>
+      <div class="stack-direction">
+        <span>↓ registered first (fires LAST)</span>
+        <span>registered last (fires FIRST) ↑</span>
+      </div>
+      ${poppedCount ? `<div class="info-strip">${poppedCount} defer(s) ইতিমধ্যে fire হয়ে pop হয়ে গেছে</div>` : ''}
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">return value</div>
+      <div class="retval-display">
+        <div class="retval-box ${retval !== null ? (fired ? 'changed final' : 'final') : 'zero'}">
+          <div class="rv-label">example() returns</div>
+          <div class="rv-value">${retval !== null ? retval : (vars.result === 0 ? '0 (zero value)' : vars.result)}</div>
+        </div>
+        ${fired && retval === 310 ? '<span style="font-family:var(--mono);font-size:11px;color:var(--value)">⚡ mutated by defer after return!</span>' : ''}
+      </div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           REAL-WORLD EXAMPLE — connectDB() LIFO ordering
+        ========================================================================= */
+        const realCode = [
+            { html: '<span class="com">// real-life pattern: cleanup ordering with defer</span>' },
+            { html: '<span class="kw">func</span> connectDB() {' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="str">"Closing database connection..."</span>)' },
+            { html: '    <span class="kw">defer</span> fmt.Println(<span class="str">"Connecting to database..."</span>)' },
+            { html: '    <span class="com">// some operations...</span>' },
+            { html: '}' },
+        ];
+        function realSteps() {
+            return [
+                {
+                    node: 0, phase: 'function starts', activeLines: [1],
+                    console: `<span class="hl-heap">connectDB()</span> চালু হলো — এখনো কোনো defer registered হয়নি।`,
+                    render: vw => renderReal(vw, [], false)
+                },
+                {
+                    node: 1, phase: 'defer #1 registered', activeLines: [2],
+                    console: `<span class="hl">defer fmt.Println("Closing...")</span> — queue-তে প্রথম এন্ট্রি। ভাবতে অদ্ভুত লাগতে পারে যে "Closing" আগে লেখা, কিন্তু defer মানেই deferred execution — এটা এখনই চলবে না।`,
+                    render: vw => renderReal(vw, [{ label: '"Closing database connection..."' }], false)
+                },
+                {
+                    node: 2, phase: 'defer #2 registered', activeLines: [3],
+                    console: `<span class="hl">defer fmt.Println("Connecting...")</span> — queue-তে দ্বিতীয় এন্ট্রি, stack-এর উপরে বসলো।`,
+                    render: vw => renderReal(vw, [{ label: '"Closing database connection..."' }, { label: '"Connecting to database..."' }], false)
+                },
+                {
+                    node: 3, phase: 'operations run, function ends', activeLines: [4, 5],
+                    console: `কিছু operation চলে গেলো, এখন function exit করার পথে। এবার defer queue <span class="hl-stack">LIFO</span> অর্ডারে pop হবে — সবার শেষে registered হওয়া "Connecting..." প্রথমে ফায়ার করবে।`,
+                    render: vw => renderReal(vw, [{ label: '"Closing database connection..."' }, { label: '"Connecting to database..."' }], false)
+                },
+                {
+                    node: 4, phase: 'pop #1: "Connecting..." fires first', activeLines: [3],
+                    console: `<span class="hl-stack">"Connecting to database..."</span> প্রিন্ট হলো — এটা সবার পরে registered হয়েছিল, তাই LIFO-তে সবার আগে fire করলো।`,
+                    render: vw => renderReal(vw, [{ label: '"Closing database connection..."' }], true),
+                    output: 'Connecting to database...'
+                },
+                {
+                    node: 5, phase: 'pop #2: "Closing..." fires last', activeLines: [2],
+                    console: `<span class="hl-stack">"Closing database connection..."</span> প্রিন্ট হলো — এটাই প্রথম registered হয়েছিল, LIFO-তে সবার শেষে fire করলো। এই কারণেই defer দিয়ে cleanup লেখার একটা স্বাভাবিক প্যাটার্ন আছে: open করার ঠিক পরেই close-এর defer লিখে রাখা — পড়তেও সহজ, ভুলে যাওয়ার সম্ভাবনাও কম।`,
+                    render: vw => renderReal(vw, [], true),
+                    output: 'Closing database connection...',
+                    takeaway: { title: 'Real-life প্যাটার্ন টেকঅ্যাওয়ে', detail: 'resource acquire করার ঠিক পরে defer দিয়ে release/cleanup লিখে রাখো — LIFO অর্ডার নিশ্চিত করে সবচেয়ে শেষে খোলা resource সবার আগে বন্ধ হবে, ঠিক যেমন nested বন্ধনীর মতো।' }
+                }
+            ];
+        }
+        function renderReal(vw, stack, fired) {
+            vw.innerHTML = `
+    <div class="vis-zone">
+      <div class="vis-zone-title">defer stack — LIFO</div>
+      <div class="defer-stack">
+        ${stack.length === 0 ? '<div class="defer-empty">(stack empty — all defers fired)</div>' :
+                    stack.map((d, i) => `<div class="defer-item"><span class="di-label">${d.label}</span><span class="di-order">#${stack.length - i}</span></div>`).join('')}
+      </div>
+      <div class="stack-direction">
+        <span>↓ registered first (fires LAST)</span>
+        <span>registered last (fires FIRST) ↑</span>
+      </div>
+    </div>
+    <div class="vis-zone">
+      <div class="vis-zone-title">why this pattern is common</div>
+      <div class="info-strip">defer release ঠিক acquire-এর পরেই লিখলে resource leak হওয়ার সুযোগ কমে যায় — কোড পড়ার সময় "open" আর তার "close" পাশাপাশি দেখা যায়।</div>
+    </div>`;
+        }
+
+        /* =========================================================================
+           TOPIC REGISTRY
+        ========================================================================= */
+        const topics = {
+            v1: { label: 'v1.0 · arg snapshot', filename: 'defer_v1.go', code: v1Code, stepsFn: v1Steps, visLabel: 'Argument Snapshot' },
+            v2: { label: 'v2.0 · closure', filename: 'defer_v2.go', code: v2Code, stepsFn: v2Steps, visLabel: 'Closure Reference' },
+            v21: { label: 'v2.1 · frozen return', filename: 'defer_v2_1.go', code: v21Code, stepsFn: v21Steps, visLabel: 'Return Already Copied' },
+            v3: { label: 'v3.0 · named return', filename: 'defer_v3.go', code: v3Code, stepsFn: v3Steps, visLabel: 'Named Return + LIFO' },
+            real: { label: 'real-world · LIFO', filename: 'connect_db.go', code: realCode, stepsFn: realSteps, visLabel: 'Cleanup Pattern' },
+        };
+        const topicOrder = ['v1', 'v2', 'v21', 'v3', 'real'];
+
+        let activeTopic = 'v1';
+        let currentStep = -1;
+        let activeSteps = [];
+
+        const topicTabsEl = document.getElementById('topicTabs');
+        function renderTopicTabs() {
+            topicTabsEl.innerHTML = topicOrder.map(key => {
+                const t = topics[key];
+                return `<div class="topic-tab ${key === activeTopic ? 'active' : ''}" id="ttab-${key}" onclick="switchTopic('${key}')">
+      <span class="tdot" style="background:${ACCENTS[key]}"></span>${t.label}
+    </div>`;
+            }).join('');
+        }
+        renderTopicTabs();
+
+        const codeView = document.getElementById('codeView');
+        function renderCode(topicKey) {
+            const t = topics[topicKey];
+            codeView.innerHTML = t.code.map((l, i) => `<div class="line" id="line-${i}"><span class="ln">${i + 1}</span>${l.html}</div>`).join('');
+            document.getElementById('filenameTag').textContent = t.filename;
+            document.getElementById('visLabel').textContent = t.visLabel;
+        }
+
+        function highlightLines(activeLines, dimLines) {
+            document.querySelectorAll('.line').forEach(el => el.classList.remove('active', 'faded', 'defer-exec'));
+            (dimLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('faded'); });
+            (activeLines || []).forEach(i => { const el = document.getElementById(`line-${i}`); if (el) el.classList.add('active'); });
+        }
+
+        const stepTrackInner = document.getElementById('stepTrackInner');
+        function renderStepperNodes(steps) {
+            stepTrackInner.innerHTML = steps.map((s, i) => `
+    <div class="step" id="step-${i}">
+      <div class="step-node">${i + 1}</div>
+      <div class="step-label">${s.phase.length > 22 ? s.phase.slice(0, 20) + '…' : s.phase}</div>
+    </div>`).join('');
+        }
+
+        function updateStepper(idx, total) {
+            const accent = ACCENTS[activeTopic];
+            document.querySelectorAll('.step').forEach((el, i) => {
+                el.classList.remove('active', 'done');
+                const node = el.querySelector('.step-node');
+                node.style.borderColor = ''; node.style.background = ''; node.style.color = '';
+                if (i < idx) { el.classList.add('done'); node.style.borderColor = accent; node.style.color = accent; }
+                if (i === idx) { el.classList.add('active'); node.style.borderColor = accent; node.style.background = accent; node.style.color = '#0a0e14'; }
+            });
+            const pct = total > 1 ? (idx / (total - 1)) * 100 : 0;
+            const bar = document.getElementById('stepperProgress');
+            bar.style.width = (idx < 0 ? 0 : pct) + '%';
+            bar.style.background = accent;
+        }
+
+        const visWrap = document.getElementById('visWrap');
+        function renderStep(step) {
+            highlightLines(step.activeLines, step.dimLines);
+            document.getElementById('phaseTag').textContent = step.phase;
+            step.render(visWrap, currentStep);
+
+            document.getElementById('consoleMsg').innerHTML = step.console;
+            updateStepper(step.node, activeSteps.length);
+
+            const extraRow = document.getElementById('extraRow');
+            // accumulate outputs rather than clear, so the full console trace builds up
+            if (step.output) {
+                let wrap = extraRow.querySelector('.output-row');
+                if (!wrap) {
+                    wrap = document.createElement('div');
+                    wrap.className = 'output-row';
+                    extraRow.appendChild(wrap);
+                }
+                const chip = document.createElement('div');
+                chip.className = 'output-chip';
+                chip.textContent = step.output;
+                wrap.appendChild(chip);
+            }
+            if (step.takeaway) {
+                const card = document.createElement('div');
+                card.className = 'takeaway-card';
+                card.innerHTML = `<div class="tt">${step.takeaway.title}</div><div class="td">${step.takeaway.detail}</div>`;
+                extraRow.appendChild(card);
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < activeSteps.length - 1) {
+                currentStep++;
+                renderStep(activeSteps[currentStep]);
+                if (currentStep === activeSteps.length - 1) {
+                    document.getElementById('btnNext').disabled = true;
+                }
+            }
+        }
+
+        function resetSim() {
+            currentStep = -1;
+            document.getElementById('extraRow').innerHTML = '';
+            highlightLines([], []);
+            document.getElementById('phaseTag').textContent = 'idle';
+            updateStepper(-1, activeSteps.length);
+            document.getElementById('btnNext').disabled = false;
+            document.getElementById('consoleMsg').innerHTML = 'একটা version বেছে নিয়ে <b>Next step</b> চাপো।';
+            visWrap.innerHTML = '';
+            if (activeSteps[0]) {
+                activeSteps[0].render(visWrap, -1);
+            }
+        }
+
+        function switchTopic(key) {
+            activeTopic = key;
+            renderTopicTabs();
+            renderCode(key);
+            activeSteps = topics[key].stepsFn();
+            renderStepperNodes(activeSteps);
+            resetSim();
+        }
+
+        switchTopic('v1');
+    </script>
+</body>
+
+</html>
