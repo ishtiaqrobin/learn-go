@@ -21,7 +21,7 @@ func main() {
 }
 
 func increment() {
-	mu.Lock()
-	defer mu.Unlock()
-	counter++
+	mu.Lock()         // ১. দরজা লক করে ভেতরে ঢোকা
+	defer mu.Unlock() // ৩. ফাংশন শেষ হওয়ার মুহূর্তে দরজা খুলে দেওয়া
+	counter++         // ২. ক্রিপ্টোগ্রাফিক বা ক্রিটিক্যাল জোনের কাজ (Read-Modify-Write)
 }
