@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
-
-var wg sync.WaitGroup
 
 func main() {
 	var ch = make(chan string) // unbuffered channel
